@@ -29,7 +29,6 @@ describe("GelatoLensGPT.sol", function () {
   let firstProfile: Signer;
   let firstProfileAddress: string;
 
-
   beforeEach("tests", async function () {
     if (hre.network.name !== "hardhat") {
       console.error("Test Suite is meant to be run on hardhat only");
@@ -42,7 +41,6 @@ describe("GelatoLensGPT.sol", function () {
 
     adminAddress = await admin.getAddress();
     await setBalance(adminAddress, ethers.utils.parseEther("1000"));
-
 
     const { lensHub: lensHubAddress, dedicatedMsgSender: dedicatedMsgSender } =
       await hre.getNamedAccounts();
@@ -93,7 +91,7 @@ describe("GelatoLensGPT.sol", function () {
     ).to.be.revertedWith("LensGelatoGPT.setPrompt: length");
   });
 
-  it("GelatoLensGPT.setPrompt: fee", async () => {
+  it("GelatoLensGPT.setFee: fee", async () => {
     await lensGelatoGPT.setFee(ethers.utils.parseEther("1"));
 
     await lensHub
@@ -107,6 +105,28 @@ describe("GelatoLensGPT.sol", function () {
     await lensGelatoGPT
       .connect(firstProfile)
       .setPrompt(1, FIRST_SENTENCE, { value: ethers.utils.parseEther("1") });
+  });
+
+  it("GelatoLensGPT.collectFee: fee", async () => {
+    await lensGelatoGPT.setFee(ethers.utils.parseEther("1"));
+
+    await lensHub
+      .connect(firstProfile)
+      .setDispatcher(1, dedicatedMsgSenderAddress);
+
+    await lensGelatoGPT
+      .connect(firstProfile)
+      .setPrompt(1, FIRST_SENTENCE, { value: ethers.utils.parseEther("1") });
+
+    let initialBalance = await firstProfile.getBalance();
+
+    await lensGelatoGPT.collectFee(firstProfileAddress);
+
+    let finishBalance = await firstProfile.getBalance();
+
+    expect(initialBalance.add(ethers.utils.parseEther("1"))).to.eq(
+      finishBalance
+    );
   });
 
   it("GelatoLensGPT.stopPrompt: onlyProfileOwner", async () => {
@@ -134,8 +154,6 @@ describe("GelatoLensGPT.sol", function () {
   });
 
   it("GelatoLensGPT.getPaginatedPrompts: query", async () => {
-
-
     await mockProfiles(15, {
       admin,
       dedicatedMsgSenderAddress,

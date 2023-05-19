@@ -180,8 +180,6 @@ describe("W3F", function () {
   });
 
   it("W3F executes query properly 10", async () => {
-  
-
     await mockProfiles(10, {
       admin,
       dedicatedMsgSenderAddress,
