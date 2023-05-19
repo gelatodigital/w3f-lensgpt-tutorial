@@ -36,7 +36,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const lensHubAddress = (userArgs.lensHubAddress as string) ?? "";
   const collectModuleAddress = (userArgs.collectModule as string) ?? "";
 
-  
   const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
   const firstNext = parseInt((await storage.get("firstNext")) ?? "0");
 
@@ -44,7 +43,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   const network = await provider.getNetwork();
   const chainId = network.chainId;
-
 
   const iface = new utils.Interface(lens_hub_abi);
 
@@ -65,8 +63,8 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     let contentURI = prompts[1].toString();
 
     if (chainId == 31337) {
+      // In hardhat test, skip ChatGPT call & IPFS publication
     } else {
-  
       // Get Sentence OpenAi
       const openai = new OpenAIApi(
         new Configuration({ apiKey: SECRETS_OPEN_AI_API_KEY })
@@ -122,18 +120,18 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
         // Upload metadata to IPFS
         const storage = new Web3Storage({ token: WEB3_STORAGE_API_KEY! });
         const myFile = new File([JSON.stringify(pub)], "publication.json");
-        const cid = await storage.put([myFile])
-        contentURI = `https://${cid}.ipfs.w3s.link/publication.json`
+        const cid = await storage.put([myFile]);
+        contentURI = `https://${cid}.ipfs.w3s.link/publication.json`;
 
-        console.log(`Publication IPFS: ${contentURI}`)
+        console.log(`Publication IPFS: ${contentURI}`);
       } else {
         return { canExec: false, message: "No OpenAi text" };
       }
     }
 
     const postData = {
-      profileId: profileId, 
-      contentURI: contentURI, 
+      profileId: profileId,
+      contentURI: contentURI,
       collectModule: collectModuleAddress, //collect Module
       collectModuleInitData: "0x",
       referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
@@ -150,8 +148,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     await storage.set("firstNext", "0");
     return { canExec: false, message: "Not Prompts to post" };
   }
- 
-
 
   if (firstNext == 0) {
     await storage.set("lastPostTime", blockTime.toString());
@@ -161,7 +157,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   } else {
     await storage.set("firstNext", (firstNext + 10).toString());
   }
-
 
   return {
     canExec: true,
