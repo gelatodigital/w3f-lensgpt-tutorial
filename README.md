@@ -14,7 +14,11 @@ DedicatedMsgSender On Mumbai = 0xcc53666e25bf52c7c5bc1e8f6e1f6bf58e871659
 
 You can create a Profile on Lens testnet (Mumbai) on [https://testnet.lenster.xyz/](https://testnet.lenster.xyz/)
 
-### Try it out
+### Try it out the wasy way
+
+You can go to our deployed app on Mumbai at [https://ethdam-gelato.web.app/](https://ethdam-gelato.web.app/)
+
+### Try it out the dev way
 
 1. Go to [https://testnet.lenster.xyz/](https://testnet.lenster.xyz/) and create a Profile on Mumbai. Copy the ProfileId.
 

@@ -85,7 +85,7 @@ describe("W3F", function () {
     expect(await lensGelatoGPT.promptByProfileId(1)).to.be.eq(FIRST_SENTENCE);
 
     const storage = {
-      firstNext: "0",
+      nextPromptIndex: "0",
       lastPostTime: "0",
     };
 
@@ -109,7 +109,7 @@ describe("W3F", function () {
     expect(await lensGelatoGPT.promptByProfileId(1)).to.be.eq(FIRST_SENTENCE);
 
     const storage = {
-      firstNext: "0",
+      nextPromptIndex: "0",
       lastPostTime: "0",
     };
 
@@ -154,7 +154,7 @@ describe("W3F", function () {
     });
 
     const storage = {
-      firstNext: "0",
+      nextPromptIndex: "0",
       lastPostTime: "0",
     };
 
@@ -166,16 +166,16 @@ describe("W3F", function () {
 
     if (w3fResultCall1.result.canExec == true) {
       expect(w3fResultCall1.result.callData.length).to.be.eq(10);
-      expect(w3fResultCall1.storage.storage.firstNext).to.be.eq("10");
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("10");
     }
 
-    storage.firstNext = "10";
+    storage.nextPromptIndex = "10";
     let w3fResultCall2 = await lensGelatoW3f.run({ userArgs, storage });
     expect(w3fResultCall2.result.canExec).to.be.eq(true);
 
     if (w3fResultCall2.result.canExec == true) {
       expect(w3fResultCall2.result.callData.length).to.be.eq(5);
-      expect(w3fResultCall2.storage.storage.firstNext).to.be.eq("0");
+      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
     }
   });
 
@@ -189,7 +189,7 @@ describe("W3F", function () {
     });
 
     const storage = {
-      firstNext: "0",
+      nextPromptIndex: "0",
       lastPostTime: "0",
     };
 
@@ -201,12 +201,12 @@ describe("W3F", function () {
 
     if (w3fResultCall1.result.canExec == true) {
       expect(w3fResultCall1.result.callData.length).to.be.eq(10);
-      expect(w3fResultCall1.storage.storage.firstNext).to.be.eq("10");
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("10");
     }
 
-    storage.firstNext = "10";
+    storage.nextPromptIndex = "10";
     let w3fResultCall2 = await lensGelatoW3f.run({ userArgs, storage });
     expect(w3fResultCall2.result.canExec).to.be.eq(false);
-    expect(w3fResultCall2.storage.storage.firstNext).to.be.eq("0");
+    expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
   });
 });

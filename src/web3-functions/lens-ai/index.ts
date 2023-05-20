@@ -36,31 +36,34 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const lensHubAddress = (userArgs.lensHubAddress as string) ?? "";
   const collectModuleAddress = (userArgs.collectModule as string) ?? "";
 
+  const NUMBER_OF_POSTS_PER_RUN = 10;
+  const INTERVAL_IN_MIN = 10;
+
+
   const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
-  const firstNext = parseInt((await storage.get("firstNext")) ?? "0");
+  const nextPromptIndex = parseInt((await storage.get("nextPromptIndex")) ?? "0");
 
-  const intervalInMin = 30;
-
+ 
   const network = await provider.getNetwork();
   const chainId = network.chainId;
 
   const iface = new utils.Interface(lens_hub_abi);
 
-  const prompt_address = lensGelatoGPTAddress;
-  const prompt = new Contract(prompt_address, prompt_abi, provider);
+  const lensGelatoGptAddress = lensGelatoGPTAddress;
+  const lensGelatoGpt= new Contract(lensGelatoGptAddress, prompt_abi, provider);
 
-  const result = await prompt.getPaginatedPrompts(firstNext, firstNext + 10);
+  const prompts = await lensGelatoGpt.getPaginatedPrompts(nextPromptIndex, nextPromptIndex + NUMBER_OF_POSTS_PER_RUN);
 
   const callDatas: Array<{ to: string; data: string }> = [];
   const blockTime = (await provider.getBlock("latest")).timestamp;
 
-  if (blockTime - lastPostTime < intervalInMin * 60 && firstNext == 0) {
+  if (blockTime - lastPostTime < INTERVAL_IN_MIN * 60 && nextPromptIndex == 0) {
     return { canExec: false, message: "Not time elapsed since last post" };
   }
 
-  for (const prompts of result) {
-    let profileId = prompts[0].toString();
-    let contentURI = prompts[1].toString();
+  for (const prompt of prompts) {
+    let profileId = prompt[0].toString();
+    let contentURI = prompt[1].toString();
 
     if (chainId == 31337) {
       // In hardhat test, skip ChatGPT call & IPFS publication
@@ -144,18 +147,21 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     });
   }
 
+  const isFirstRun = nextPromptIndex == 0;
+  const isLastRun = callDatas.length < NUMBER_OF_POSTS_PER_RUN
+
   if (callDatas.length == 0) {
-    await storage.set("firstNext", "0");
+    await storage.set("nextPromptIndex", "0");
     return { canExec: false, message: "Not Prompts to post" };
   }
 
-  if (firstNext == 0) {
+  if (isFirstRun) {
     await storage.set("lastPostTime", blockTime.toString());
   }
-  if (callDatas.length < 10) {
-    await storage.set("firstNext", "0");
+  if (isLastRun) {
+    await storage.set("nextPromptIndex", "0");
   } else {
-    await storage.set("firstNext", (firstNext + 10).toString());
+    await storage.set("nextPromptIndex", (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString());
   }
 
   return {
