@@ -37,22 +37,32 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const collectModuleAddress = (userArgs.collectModule as string) ?? "";
 
   const NUMBER_OF_POSTS_PER_RUN = 10;
-  const INTERVAL_IN_MIN = 10;
-
+  const INTERVAL_IN_MIN = 30;
 
   const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
-  const nextPromptIndex = parseInt((await storage.get("nextPromptIndex")) ?? "0");
+  const nextPromptIndex = parseInt(
+    (await storage.get("nextPromptIndex")) ?? "0"
+  );
 
- 
   const network = await provider.getNetwork();
   const chainId = network.chainId;
 
+  console.log(chainId);
   const iface = new utils.Interface(lens_hub_abi);
 
   const lensGelatoGptAddress = lensGelatoGPTAddress;
-  const lensGelatoGpt= new Contract(lensGelatoGptAddress, prompt_abi, provider);
+  const lensGelatoGpt = new Contract(
+    lensGelatoGptAddress,
+    prompt_abi,
+    provider
+  );
 
-  const prompts = await lensGelatoGpt.getPaginatedPrompts(nextPromptIndex, nextPromptIndex + NUMBER_OF_POSTS_PER_RUN);
+  const prompts = await lensGelatoGpt.getPaginatedPrompts(
+    nextPromptIndex,
+    nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
+  );
+
+  // const prompts = await lensGelatoGpt.getPaginatedPrompts(1, 2);
 
   const callDatas: Array<{ to: string; data: string }> = [];
   const blockTime = (await provider.getBlock("latest")).timestamp;
@@ -74,14 +84,21 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       );
       const response = await openai.createCompletion({
         model: "text-davinci-003",
-        prompt: ` ${contentURI} in 15 words`,
+        prompt: ` ${contentURI} in less than 15 words.`,
         temperature: 1,
-        max_tokens: 30,
+        max_tokens: 256,
+        top_p: 1,
+        frequency_penalty: 1.5,
+        presence_penalty: 1,
       });
-      const text = response.data.choices[0].text;
-      console.log(`Text generated: ${text}`);
+      let text = response.data.choices[0].text as string;
 
       if (text != undefined) {
+        // let i = text.indexOf("\n\n");
+        // if (i != -1) {
+        //   text = text.substring(i + 2, text.length - 1);
+        // } 
+        console.log(`Text generated: ${text}`);
         /// Build and validate Publication Metadata
         const uuid = uuidv4();
         const pub = {
@@ -148,7 +165,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   }
 
   const isFirstRun = nextPromptIndex == 0;
-  const isLastRun = callDatas.length < NUMBER_OF_POSTS_PER_RUN
+  const isLastRun = callDatas.length < NUMBER_OF_POSTS_PER_RUN;
 
   if (callDatas.length == 0) {
     await storage.set("nextPromptIndex", "0");
@@ -161,7 +178,10 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   if (isLastRun) {
     await storage.set("nextPromptIndex", "0");
   } else {
-    await storage.set("nextPromptIndex", (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString());
+    await storage.set(
+      "nextPromptIndex",
+      (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
+    );
   }
 
   return {

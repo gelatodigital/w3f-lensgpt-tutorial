@@ -16,7 +16,7 @@
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "postinstall": "yarn husky install",
     "w3f:deploy": "npx w3f deploy src/web3-functions/lens-ai/index.ts",
-    "w3f:test": "npx w3f test src/web3-functions/lens-ai/index.ts --logs"
+    "w3f:test": "npx w3f test src/web3-functions/lens-ai/index.ts --logs --chain-id=80001"
   },
   "license": "ISC",
   "devDependencies": {
