@@ -37,7 +37,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const collectModuleAddress = (userArgs.collectModule as string) ?? "";
 
   const NUMBER_OF_POSTS_PER_RUN = 10;
-  const INTERVAL_IN_MIN = 30;
+  const INTERVAL_IN_MIN = 60;
 
   const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
   const nextPromptIndex = parseInt(
