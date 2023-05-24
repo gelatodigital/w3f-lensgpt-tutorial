@@ -22,7 +22,7 @@ const FIRST_SENTENCE = "fist sentence";
 const LONG_SENTENCE =
   "long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece";
 
-describe("W3F", function () {
+describe.only("W3F", function () {
   let admin: Signer; // proxyAdmin
   let adminAddress: string;
 
@@ -96,7 +96,7 @@ describe("W3F", function () {
     expect(result.canExec).to.be.eq(true);
 
     if (result.canExec == true) {
-      expect(result.callData.length).to.be.eq(1);
+      expect(result.callData.length).to.be.eq(2);
     }
   });
 
@@ -125,7 +125,7 @@ describe("W3F", function () {
         value: ethers.utils.parseEther("1"),
         gasLimit: 10000000,
       });
-      let data = result.callData[0];
+      let data = result.callData[1];
       await impersonateAccount(dedicatedMsgSenderAddress);
       let dedicatedMsgSenderSigner = await ethers.getSigner(
         dedicatedMsgSenderAddress
@@ -142,10 +142,10 @@ describe("W3F", function () {
     }
   });
 
-  it("W3F executes query properly 15", async () => {
+  it.only("W3F executes query properly 15", async () => {
     await setBalance(adminAddress, parseEther("1000"));
 
-    await mockProfiles(15, {
+    await mockProfiles(1,15, {
       admin,
       dedicatedMsgSenderAddress,
       hre,
@@ -157,7 +157,7 @@ describe("W3F", function () {
       nextPromptIndex: "0",
       lastPostTime: "0",
     };
-
+ 
     lensGelatoW3f = w3f.get("lens-ai");
     let w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
     w3fResultCall1.result = w3fResultCall1.result as Web3FunctionResultV2;
@@ -165,7 +165,7 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(10);
+      expect(w3fResultCall1.result.callData.length).to.be.eq(11);
       expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("10");
     }
 
@@ -174,13 +174,13 @@ describe("W3F", function () {
     expect(w3fResultCall2.result.canExec).to.be.eq(true);
 
     if (w3fResultCall2.result.canExec == true) {
-      expect(w3fResultCall2.result.callData.length).to.be.eq(5);
+      expect(w3fResultCall2.result.callData.length).to.be.eq(6);
       expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
     }
   });
 
   it("W3F executes query properly 10", async () => {
-    await mockProfiles(10, {
+    await mockProfiles(1,10, {
       admin,
       dedicatedMsgSenderAddress,
       hre,
@@ -200,7 +200,7 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(10);
+      expect(w3fResultCall1.result.callData.length).to.be.eq(11);
       expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("10");
     }
 

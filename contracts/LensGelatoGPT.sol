@@ -30,16 +30,25 @@ contract LensGelatoGPT is Proxied {
 
     EnumerableSetUpgradeable.UintSet private _profiles;
 
+    EnumerableSetUpgradeable.UintSet private _newcomers;
+
     constructor(ILensHub _lensHub, address _dedicatedMsgSender) {
         lensHub = _lensHub;
         dedicatedMsgSender = _dedicatedMsgSender;
     }
 
     modifier onlyProfileOwner(uint256 _profileId) {
-  
         require(
             msg.sender == lensHub.ownerOf(_profileId),
             "LensGelatoGPT.onlyProfileOwner"
+        );
+        _;
+    }
+
+    modifier onlyDedicatedMsgSender() {
+        require(
+            msg.sender == dedicatedMsgSender,
+            "LensGelatoGPT.onlyDedicatedMsgSender"
         );
         _;
     }
@@ -52,11 +61,10 @@ contract LensGelatoGPT is Proxied {
         _to.sendValue(address(this).balance);
     }
 
-    function setPrompt (
+    function setPrompt(
         uint256 _profileId,
         string calldata _prompt
-    ) onlyProfileOwner(_profileId) external payable  {
-    
+    ) external payable onlyProfileOwner(_profileId) {
         require(msg.value == fee, "LensGelatoGPT.setPrompt: fee");
         require(
             bytes(_prompt).length <= 160,
@@ -66,6 +74,10 @@ contract LensGelatoGPT is Proxied {
             lensHub.getDispatcher(_profileId) == dedicatedMsgSender,
             "LensGelatoGPT.setPrompt: dispatcher"
         );
+        // If first propmt will track in newcomers enumerable map
+
+        _newcomers.add(_profileId);
+
         _profiles.add(_profileId);
         promptByProfileId[_profileId] = _prompt;
     }
@@ -81,27 +93,103 @@ contract LensGelatoGPT is Proxied {
         delete promptByProfileId[_profileId];
     }
 
+    // Executed
+
+    function availableNewcomers() external view returns (bool available) {
+        available = _newcomers.length() > 0;
+    }
+
+    function updateNewcomersSet(
+        uint256 _toDeleteNewcomers
+    ) external onlyDedicatedMsgSender {
+        uint256[] memory toDeleteArray = new uint256[](_toDeleteNewcomers);
+        for (uint256 i = 0; i < _toDeleteNewcomers; i++) {
+            uint256 profileId = _newcomers.at(i);
+            toDeleteArray[i] = profileId;
+        }
+         
+        for (uint256 i = 0; i < _toDeleteNewcomers; i++) {
+            _newcomers.remove(toDeleteArray[i]);
+        }
+           
+    }
+
     function getPaginatedPrompts(
         uint256 _from,
-        uint256 _to
-    ) external view returns (Prompt[] memory results) {
-        require(_from < _to, "LensGelatoGPT.getPaginatedPrompts: _to");
+        bool _inRun
+    )
+        external
+        view
+        returns (
+            Prompt[] memory results,
+            uint256 nextPromptIndex,
+            uint256 newcomersPointer
+        )
+    {
+        // require(_from < _to, "LensGelatoGPT.getPaginatedPrompts: _to");
         require(
             _from <= _profiles.length(),
             "LensGelatoGPT.getPaginatedPrompts: _from"
         );
 
-        if (_to >= _profiles.length()) _to = _profiles.length();
+        nextPromptIndex = _from;
 
-        results = new Prompt[](_to - _from);
+        // if (_to >= _profiles.length()) _to = _profiles.length();
+        newcomersPointer = 0;
+        uint256 resultsLength;
 
-        for (uint256 i = _from; i < _to; i++) {
-            uint256 profileId = _profiles.at(i);
-            Prompt memory prompt = Prompt(
-                profileId,
-                promptByProfileId[profileId]
-            );
-            results[i - _from] = prompt;
+ 
+
+        // include newcomersinto results array;
+        (results, resultsLength) = getNewcomers();
+        newcomersPointer = newcomersPointer + resultsLength;
+
+        if (resultsLength == 10 || !_inRun) {
+            return (results, nextPromptIndex, newcomersPointer);
         }
+
+        for (uint256 i = _from; i < _profiles.length(); i++) {
+            uint256 profileId = _profiles.at(i);
+            // check if dispatcher still valid
+            if (lensHub.getDispatcher(profileId) == dedicatedMsgSender) {
+                results[resultsLength] = getPrompt(profileId);
+                resultsLength++;
+                nextPromptIndex++;
+
+                if (resultsLength == 10) {
+                    return (results, nextPromptIndex, newcomersPointer);
+                }
+            }
+        }
+    }
+
+    //// internal Functions
+    function getNewcomers()
+        internal
+        view
+        returns (Prompt[] memory results, uint256 resultsLength)
+    {
+        results = new Prompt[](10);
+
+        if (_newcomers.length() > 0) {
+            for (uint256 i = 0; i < _newcomers.length(); i++) {
+                uint256 profileId = _newcomers.at(i);
+                // check if dispatcher still valid
+
+                if (lensHub.getDispatcher(profileId) == dedicatedMsgSender) {
+                    results[resultsLength] = getPrompt(profileId);
+                    if (resultsLength == 10) {
+                        return (results, resultsLength);
+                    }
+                }
+                resultsLength++;
+            }
+        }
+    }
+
+    function getPrompt(
+        uint256 profileId
+    ) internal view returns (Prompt memory prompt) {
+        prompt = Prompt(profileId, promptByProfileId[profileId]);
     }
 }

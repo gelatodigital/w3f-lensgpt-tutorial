@@ -5,15 +5,15 @@ import {
     impersonateAccount,
     setBalance,
   } from "@nomicfoundation/hardhat-network-helpers";
-export const mockProfiles = async (total:number, config:{
+export const mockProfiles = async (init:number,total:number, config:{
   admin:Signer, lensHub:ILensHub, hre:any, dedicatedMsgSenderAddress:string,
   lensGelatoGPT:LensGelatoGPT
 }) => {
-let init = 1;
+
 for (let i = init; i < init + total; i++) {
   console.log('\x1b[32m%s\x1b[0m', `    ✔ Mocking Lens Profile ${i}`);
   const profileAddress = await config.lensHub.ownerOf(i);
-  let initialPoolEth = ethers.utils.parseEther("1");
+  let initialPoolEth = ethers.utils.parseEther("10");
 
 
   await config.admin.sendTransaction({
@@ -38,7 +38,6 @@ for (let i = init; i < init + total; i++) {
 
   let myPrompt = `test sentence nr ${i}`;
   await config.lensGelatoGPT.connect(profile).setPrompt(i, myPrompt);
-
 
 }
 }

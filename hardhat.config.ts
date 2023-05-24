@@ -55,6 +55,10 @@ const config: HardhatUserConfig = {
         //blockNumber: 16620765,
       },
     },
+    localhost: {
+      url: 'http://localhost:8545',
+      chainId: 31337,
+    },
     ethereum: {
       accounts: PK ? [PK] : [],
       chainId: 1,

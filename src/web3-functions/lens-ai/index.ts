@@ -37,9 +37,10 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const collectModuleAddress = (userArgs.collectModule as string) ?? "";
 
   const NUMBER_OF_POSTS_PER_RUN = 10;
-  const INTERVAL_IN_MIN = 60;
+  const INTERVAL_IN_MIN = 240;
 
   const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
+
   const nextPromptIndex = parseInt(
     (await storage.get("nextPromptIndex")) ?? "0"
   );
@@ -47,7 +48,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const network = await provider.getNetwork();
   const chainId = network.chainId;
 
-  console.log(chainId);
   const iface = new utils.Interface(lens_hub_abi);
 
   const lensGelatoGptAddress = lensGelatoGPTAddress;
@@ -57,21 +57,54 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     provider
   );
 
-  const prompts = await lensGelatoGpt.getPaginatedPrompts(
-    nextPromptIndex,
-    nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
-  );
 
-  // const prompts = await lensGelatoGpt.getPaginatedPrompts(1, 2);
+
+  const availableNewcomers =
+    (await lensGelatoGpt.availableNewcomers()) as boolean;
+
+
 
   const callDatas: Array<{ to: string; data: string }> = [];
   const blockTime = (await provider.getBlock("latest")).timestamp;
 
-  if (blockTime - lastPostTime < INTERVAL_IN_MIN * 60 && nextPromptIndex == 0) {
-    return { canExec: false, message: "Not time elapsed since last post" };
+
+
+  const timeElapsed = (blockTime - lastPostTime) >= INTERVAL_IN_MIN * 60;
+
+
+
+  const inRun = nextPromptIndex > 0 || (timeElapsed && nextPromptIndex == 0);
+
+ 
+
+  if (timeElapsed && nextPromptIndex == 0 && !availableNewcomers) {
+    return {
+      canExec: false,
+      message: "Not time elapsed since last post and not newcomers",
+    };
   }
 
-  for (const prompt of prompts) {
+
+  const prompts = await lensGelatoGpt.getPaginatedPrompts(
+    nextPromptIndex,
+    inRun
+  );
+
+
+  if (prompts.newcomersPointer > 0) {
+    callDatas.push({
+      to: lensGelatoGPTAddress,
+      data: lensGelatoGpt.interface.encodeFunctionData("updateNewcomersSet", [
+        prompts.newcomersPointer,
+      ]),
+    });
+  }
+
+  let promptsCleaned = [...new Set(prompts.results)].filter(
+    (fil: any) => fil.profileId.toString() != "0"
+  ) as Array<string>;
+
+  for (const prompt of promptsCleaned) {
     let profileId = prompt[0].toString();
     let contentURI = prompt[1].toString();
 
@@ -97,7 +130,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
         // let i = text.indexOf("\n\n");
         // if (i != -1) {
         //   text = text.substring(i + 2, text.length - 1);
-        // } 
+        // }
         console.log(`Text generated: ${text}`);
         /// Build and validate Publication Metadata
         const uuid = uuidv4();
@@ -175,13 +208,10 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   if (isFirstRun) {
     await storage.set("lastPostTime", blockTime.toString());
   }
-  if (isLastRun) {
+  if (isLastRun && inRun) {
     await storage.set("nextPromptIndex", "0");
   } else {
-    await storage.set(
-      "nextPromptIndex",
-      (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
-    );
+    await storage.set("nextPromptIndex", prompts.nextPromptIndex.toString());
   }
 
   return {
