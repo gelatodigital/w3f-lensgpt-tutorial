@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import "hardhat/console.sol";
 import {Proxied} from "./vendor/hardhat-deploy/Proxied.sol";
 import {ILensHub} from "./vendor/lens/ILensHub.sol";
 import {
@@ -94,8 +95,11 @@ contract LensGelatoGPT is Proxied {
     function removeNewProfileIds(
         uint256[] calldata __profileIds
     ) external onlyDedicatedMsgSender {
-        for (uint256 i = 0; i < __profileIds.length; i++)
+ 
+        for (uint256 i = 0; i < __profileIds.length; i++){
+    
             _newProfileIds.remove(__profileIds[i]);
+        }
     }
 
     function getPaginatedPrompts(

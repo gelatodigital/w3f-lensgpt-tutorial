@@ -57,44 +57,57 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     provider
   );
 
-  const availableNewcomers =
-    (await lensGelatoGpt.availableNewcomers()) as boolean;
+  const areThereNewProfileIds =
+    (await lensGelatoGpt.areThereNewProfileIds()) as boolean;
 
   const callDatas: Array<{ to: string; data: string }> = [];
   const blockTime = (await provider.getBlock("latest")).timestamp;
 
+  let prompts;
+
   const timeElapsed = blockTime - lastPostTime >= INTERVAL_IN_MIN * 60;
+ 
 
-  const inRun = nextPromptIndex > 0 || (timeElapsed && nextPromptIndex == 0);
-
-  if (timeElapsed && nextPromptIndex == 0 && !availableNewcomers) {
+  if (!timeElapsed && nextPromptIndex == 0 && !areThereNewProfileIds) {
     return {
       canExec: false,
       message: "Not time elapsed since last post and not newcomers",
     };
   }
 
-  const prompts = await lensGelatoGpt.getPaginatedPrompts(
-    nextPromptIndex,
-    inRun
-  );
 
-  if (prompts.newcomersPointer > 0) {
-    callDatas.push({
-      to: lensGelatoGPTAddress,
-      data: lensGelatoGpt.interface.encodeFunctionData("updateNewcomersSet", [
-        prompts.newcomersPointer,
-      ]),
-    });
+  /// First Post Available newcomers
+  if (areThereNewProfileIds) {
+    prompts = await lensGelatoGpt.getNewPrompts();
+
+    let profileIds = [];
+
+    for (const prompt of prompts) {
+      profileIds.push(+prompt[0].toString());
+    }
+
+    if (profileIds.length > 0) {
+      callDatas.push({
+        to: lensGelatoGPTAddress,
+        data: lensGelatoGpt.interface.encodeFunctionData(
+          "removeNewProfileIds",
+          [profileIds]
+        ),
+      });
+    }
+  } else {
+    prompts = await lensGelatoGpt.getPaginatedPrompts(
+      nextPromptIndex,
+      nextPromptIndex + 10
+    );
   }
 
-  let promptsCleaned = [...new Set(prompts.results)].filter(
-    (fil: any) => fil.profileId.toString() != "0"
-  ) as Array<string>;
-
-  for (const prompt of promptsCleaned) {
+  for (const prompt of prompts) {
+    
     let profileId = prompt[0].toString();
     let contentURI = prompt[1].toString();
+
+   
 
     if (chainId == 31337) {
       // In hardhat test, skip ChatGPT call & IPFS publication
@@ -185,23 +198,27 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     });
   }
 
+
+
   const isFirstRun = nextPromptIndex == 0;
   const isLastRun = callDatas.length < NUMBER_OF_POSTS_PER_RUN;
 
-  if (callDatas.length == 0) {
-    await storage.set("nextPromptIndex", "0");
-    return { canExec: false, message: "Not Prompts to post" };
-  }
+  //only update pagination when not newcomers
+  if (!areThereNewProfileIds) {
+    if (callDatas.length == 0) {
+      await storage.set("nextPromptIndex", "0");
+      return { canExec: false, message: "Not Prompts to post" };
+    }
 
-  if (isFirstRun) {
-    await storage.set("lastPostTime", blockTime.toString());
+    if (isFirstRun) {
+      await storage.set("lastPostTime", blockTime.toString());
+    }
+    if (isLastRun) {
+      await storage.set("nextPromptIndex", "0");
+    } else {
+      await storage.set("nextPromptIndex", (nextPromptIndex + 10).toString());
+    }
   }
-  if (isLastRun && inRun) {
-    await storage.set("nextPromptIndex", "0");
-  } else {
-    await storage.set("nextPromptIndex", prompts.nextPromptIndex.toString());
-  }
-
   return {
     canExec: true,
     callData: callDatas,

@@ -6,11 +6,12 @@ import {
   setBalance,
 } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { BigNumber, Contract, constants } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import hre, { deployments, ethers } from "hardhat";
 import { LensGelatoGPT, ILensHub } from "../typechain";
 import { lens_hub_abi } from "../helpers/lens_hub_abi";
 import { mockProfiles } from "./helpers/MockProfiles";
+import { parseEther } from "ethers/lib/utils";
 
 const FIRST_SENTENCE = "fist sentence";
 const LONG_SENTENCE =
@@ -153,230 +154,47 @@ describe("GelatoLensGPT.sol", function () {
     expect(await lensGelatoGPT.promptByProfileId(1)).to.be.eq("");
   });
 
-  it("GelatoLensGPT.getPaginatedPrompts: query not in run", async () => {
-    await mockProfiles(1, 3, {
+  it("GelatoLensGPT.getPaginatedPrompts: query", async () => {
+    await mockProfiles(1,15, {
       admin,
       dedicatedMsgSenderAddress,
       hre,
       lensGelatoGPT,
       lensHub,
     });
-
-    let result = await lensGelatoGPT
-      .connect(admin)
-      .getPaginatedPrompts(0, false);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(result.nextPromptIndex).to.be.eq(0);
-
-    expect(result.newcomersPointer).to.be.eq(3);
 
     expect(
-      result.results.filter((fil) => fil.profileId.toString() != "0").length
-    ).to.be.eq(3);
-  });
-
-  it("GelatoLensGPT.getPaginatedPrompts: query in run", async () => {
-    await mockProfiles(1, 3, {
-      admin,
-      dedicatedMsgSenderAddress,
-      hre,
-      lensGelatoGPT,
-      lensHub,
-    });
-
-    let result = await lensGelatoGPT
-      .connect(admin)
-      .getPaginatedPrompts(0, true);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(result.nextPromptIndex).to.be.eq(3);
-
-    expect(result.newcomersPointer).to.be.eq(3);
+      (await lensGelatoGPT.connect(admin).getPaginatedPrompts(0, 10)).length
+    ).to.be.eq(10);
 
     expect(
-      result.results.filter((fil) => fil.profileId.toString() != "0").length
-    ).to.be.eq(6);
-  });
-
-  it("GelatoLensGPT.getPaginatedPrompts: fault dispatcher skip", async () => {
-    await mockProfiles(1, 5, {
-      admin,
-      dedicatedMsgSenderAddress,
-      hre,
-      lensGelatoGPT,
-      lensHub,
-    });
-
-    let result = await lensGelatoGPT
-      .connect(admin)
-      .getPaginatedPrompts(0, true);
-
-    const firstProfileResult = result.results[0];
-
-    let firstProfileAddressResult = await lensHub.ownerOf(
-      firstProfileResult.profileId
-    );
-
-    await impersonateAccount(firstProfileAddressResult);
-    let firstProfileResultSigner = await ethers.getSigner(
-      firstProfileAddressResult
-    );
-
-    await lensHub
-      .connect(firstProfileResultSigner)
-      .setDispatcher(firstProfileResult.profileId, constants.AddressZero);
-
-    result = await lensGelatoGPT.connect(admin).getPaginatedPrompts(0, true);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(result.nextPromptIndex).to.be.eq(4);
-
-    expect(result.newcomersPointer).to.be.eq(5);
-  });
-
-  it("GelatoLensGPT.getPaginatedPrompts: newcomers only next run", async () => {
-    await mockProfiles(1, 5, {
-      admin,
-      dedicatedMsgSenderAddress,
-      hre,
-      lensGelatoGPT,
-      lensHub,
-    });
-
-    await impersonateAccount(dedicatedMsgSenderAddress);
-    let dedicatedMsgSenderSigner = await ethers.getSigner(
-      dedicatedMsgSenderAddress
-    );
-
-    let initialPoolEth = ethers.utils.parseEther("1");
-
-    await admin.sendTransaction({
-      to: dedicatedMsgSenderAddress,
-      value: initialPoolEth,
-    });
-
-    await lensGelatoGPT.connect(dedicatedMsgSenderSigner).updateNewcomersSet(5);
-
-    let result = await lensGelatoGPT
-      .connect(admin)
-      .getPaginatedPrompts(0, true);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(result.nextPromptIndex).to.be.eq(5);
-
-    expect(result.newcomersPointer).to.be.eq(0);
-
-    expect(
-      result.results.filter((fil) => fil.profileId.toString() != "0").length
+      (await lensGelatoGPT.connect(admin).getPaginatedPrompts(10, 20)).length
     ).to.be.eq(5);
   });
 
-  it("GelatoLensGPT.getPaginatedPrompts: newcomers pushed when in run", async () => {
-    await mockProfiles(1, 15, {
+
+  it("GelatoLensGPT.getNewPrompts: query", async () => {
+    await mockProfiles(1,15, {
       admin,
       dedicatedMsgSenderAddress,
       hre,
       lensGelatoGPT,
       lensHub,
     });
-
-    await impersonateAccount(dedicatedMsgSenderAddress);
-    let dedicatedMsgSenderSigner = await ethers.getSigner(
-      dedicatedMsgSenderAddress
-    );
-
-    let initialPoolEth = ethers.utils.parseEther("1");
-
-    await admin.sendTransaction({
-      to: dedicatedMsgSenderAddress,
-      value: initialPoolEth,
-    });
-
-    await lensGelatoGPT
-      .connect(dedicatedMsgSenderSigner)
-      .updateNewcomersSet(15);
-
-    await mockProfiles(16, 3, {
-      admin,
-      dedicatedMsgSenderAddress,
-      hre,
-      lensGelatoGPT,
-      lensHub,
-    });
-
-    let result = await lensGelatoGPT
-      .connect(admin)
-      .getPaginatedPrompts(0, true);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(result.nextPromptIndex).to.be.eq(7);
-
-    expect(result.newcomersPointer).to.be.eq(3);
-
-    await lensGelatoGPT.connect(dedicatedMsgSenderSigner).updateNewcomersSet(3);
-
-    result = await lensGelatoGPT.connect(admin).getPaginatedPrompts(7, true);
-
-    expect(+result.results[0].profileId.toString()).to.be.eq(8);
-
-    expect(result.nextPromptIndex).to.be.eq(17);
-
-    expect(result.newcomersPointer).to.be.eq(0);
-
-    result = await lensGelatoGPT.connect(admin).getPaginatedPrompts(17, true);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(+result.results[0].profileId.toString()).to.be.eq(18);
-
-    expect(result.nextPromptIndex).to.be.eq(18);
-
-    expect(result.newcomersPointer).to.be.eq(0);
 
     expect(
-      result.results.filter((fil) => fil.profileId.toString() != "0").length
-    ).to.be.eq(1);
-  });
+      (await lensGelatoGPT.connect(admin).getNewPrompts()).length
+    ).to.be.eq(15);
 
-  it("GelatoLensGPT.getPaginatedPrompts: only newcomers returned when not in run", async () => {
-    await mockProfiles(1, 15, {
-      admin,
-      dedicatedMsgSenderAddress,
-      hre,
-      lensGelatoGPT,
-      lensHub,
-    });
-
+    await setBalance(dedicatedMsgSenderAddress, parseEther("1"));
     await impersonateAccount(dedicatedMsgSenderAddress);
     let dedicatedMsgSenderSigner = await ethers.getSigner(
       dedicatedMsgSenderAddress
     );
+     await lensGelatoGPT.connect(dedicatedMsgSenderSigner).removeNewProfileIds([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15])
 
-    let initialPoolEth = ethers.utils.parseEther("1");
-
-    await admin.sendTransaction({
-      to: dedicatedMsgSenderAddress,
-      value: initialPoolEth,
-    });
-
-    await lensGelatoGPT.connect(dedicatedMsgSenderSigner).updateNewcomersSet(5);
-
-    let result = await lensGelatoGPT
-      .connect(admin)
-      .getPaginatedPrompts(0, false);
-
-    expect(result.results.length).to.be.eq(10);
-
-    expect(result.nextPromptIndex).to.be.eq(0);
-
-    expect(result.newcomersPointer).to.be.eq(10);
-    expect(+result.results[0].profileId.toString()).to.be.eq(15);
-    expect(+result.results[9].profileId.toString()).to.be.eq(10);
+    expect(
+      (await lensGelatoGPT.connect(admin).getNewPrompts()).length
+    ).to.be.eq(0);
   });
 });
