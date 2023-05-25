@@ -1,4 +1,4 @@
-export const prompt_abi = [
+export const promptAbi = [
   {
     "inputs": [
       {

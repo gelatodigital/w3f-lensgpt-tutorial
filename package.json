@@ -1,5 +1,5 @@
 {
-  "name": "lens-ai-poc",
+  "name": "lenschatgpt-poc",
   "version": "0.0.1",
   "description": "Smart Oracle that pushes prices online every hour or when the price difference with the last price is greater or equal than 2%",
   "scripts": {
@@ -15,8 +15,8 @@
     "lint:ts": "eslint -c .eslintrc.json --ext \"**/*.ts\" \"**/*.test.ts\"",
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "postinstall": "yarn husky install",
-    "w3f:deploy": "npx w3f deploy src/web3-functions/lens-ai/index.ts",
-    "w3f:test": "npx w3f test src/web3-functions/lens-ai/index.ts --logs --chain-id=80001"
+    "w3f:deploy": "npx w3f deploy src/web3-functions/lensChatGPT/index.ts",
+    "w3f:test": "npx w3f test src/web3-functions/lensChatGPT/index.ts --logs --chain-id=80001"
   },
   "license": "ISC",
   "devDependencies": {

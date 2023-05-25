@@ -18,7 +18,7 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 // HardhatUserConfig bug
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const config: HardhatUserConfig = {
-  defaultNetwork: "polygon",
+  defaultNetwork: "hardhat",
 
   // web3 functions
   w3f: {
@@ -54,10 +54,6 @@ const config: HardhatUserConfig = {
         url: "https://polygon-rpc.com",
         blockNumber: 43087643,
       },
-    },
-    localhost: {
-      url: "http://localhost:8545",
-      chainId: 31337,
     },
     ethereum: {
       accounts: PK ? [PK] : [],

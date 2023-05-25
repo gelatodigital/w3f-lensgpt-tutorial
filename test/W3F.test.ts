@@ -9,7 +9,7 @@ import { expect } from "chai";
 import { BigNumber, Contract } from "ethers";
 import hre, { deployments, ethers, w3f } from "hardhat";
 import { LensGelatoGPT, ILensHub } from "../typechain";
-import { lens_hub_abi } from "../helpers/lens_hub_abi";
+import { lensHubAbi } from "../helpers/lensHubAbi";
 import {
   Web3FunctionUserArgs,
   Web3FunctionResultV2,
@@ -64,7 +64,7 @@ describe("W3F", function () {
       ).address
     )) as LensGelatoGPT;
 
-    lensHub = new Contract(lensHubAddress, lens_hub_abi, admin) as ILensHub;
+    lensHub = new Contract(lensHubAddress, lensHubAbi, admin) as ILensHub;
     firstProfileAddress = await lensHub.ownerOf(1);
     await impersonateAccount(firstProfileAddress);
     firstProfile = await ethers.getSigner(firstProfileAddress);

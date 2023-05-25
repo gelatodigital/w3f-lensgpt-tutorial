@@ -9,7 +9,7 @@ import { Configuration, OpenAIApi } from "openai";
 import { v4 as uuidv4 } from "uuid";
 import { Web3Storage, File } from "web3.storage";
 
-import { lens_hub_abi } from "../../../helpers/lens_hub_abi";
+import { lensHubAbi } from "../../../helpers/lensHubAbi";
 import {
   LensClient,
   PublicationMainFocus,
@@ -17,7 +17,7 @@ import {
   development,
   production,
 } from "@lens-protocol/client";
-import { prompt_abi } from "../../../helpers/prompt_abi";
+import { promptAbi } from "../../../helpers/promptAbi";
 
 Web3Function.onRun(async (context: Web3FunctionContext) => {
   const { userArgs, multiChainProvider, secrets, storage } = context;
@@ -36,7 +36,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const lensHubAddress = (userArgs.lensHubAddress as string) ?? "";
   const collectModuleAddress = (userArgs.collectModule as string) ?? "";
 
-  const NUMBER_OF_POSTS_PER_RUN = 10;
+  const NUMBER_OF_POSTS_PER_RUN = 5;
   const INTERVAL_IN_MIN = 240;
 
   const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
@@ -48,12 +48,12 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const network = await provider.getNetwork();
   const chainId = network.chainId;
 
-  const iface = new utils.Interface(lens_hub_abi);
+  const iface = new utils.Interface(lensHubAbi);
 
   const lensGelatoGptAddress = lensGelatoGPTAddress;
   const lensGelatoGpt = new Contract(
     lensGelatoGptAddress,
-    prompt_abi,
+    promptAbi,
     provider
   );
 
@@ -82,8 +82,11 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
     let profileIds = [];
 
+    let i = 0;
     for (const prompt of prompts) {
+      i++
       profileIds.push(+prompt[0].toString());
+      if (i==5) continue;
     }
 
     if (profileIds.length > 0) {
@@ -98,7 +101,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   } else {
     prompts = await lensGelatoGpt.getPaginatedPrompts(
       nextPromptIndex,
-      nextPromptIndex + 10
+      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
     );
   }
 
@@ -128,10 +131,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       let text = response.data.choices[0].text as string;
 
       if (text != undefined) {
-        // let i = text.indexOf("\n\n");
-        // if (i != -1) {
-        //   text = text.substring(i + 2, text.length - 1);
-        // }
+
         console.log(`Text generated: ${text}`);
         /// Build and validate Publication Metadata
         const uuid = uuidv4();
@@ -216,7 +216,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     if (isLastRun) {
       await storage.set("nextPromptIndex", "0");
     } else {
-      await storage.set("nextPromptIndex", (nextPromptIndex + 10).toString());
+      await storage.set("nextPromptIndex", (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString());
     }
   }
   return {
