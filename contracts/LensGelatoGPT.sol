@@ -23,7 +23,7 @@ contract LensGelatoGPT is Proxied {
 
     address public immutable dedicatedMsgSender;
 
-    uint256 public fee;
+    uint256 public fee = 5 ether;
 
     mapping(uint256 => string) public promptByProfileId;
 
