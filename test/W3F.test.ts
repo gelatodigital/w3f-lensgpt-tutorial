@@ -89,7 +89,7 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
+    lensGelatoW3f = w3f.get("lensChatGPT");
     let { result } = await lensGelatoW3f.run({ userArgs, storage });
     result = result as Web3FunctionResultV2;
 
@@ -113,7 +113,7 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
+    lensGelatoW3f = w3f.get("lensChatGPT");
     let { result } = await lensGelatoW3f.run({ userArgs, storage });
     result = result as Web3FunctionResultV2;
 
@@ -158,7 +158,7 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
+    lensGelatoW3f = w3f.get("lensChatGPT");
     let w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
     w3fResultCall1.result = w3fResultCall1.result as Web3FunctionResultV2;
 
@@ -189,18 +189,18 @@ describe("W3F", function () {
     expect(w3fResultCall2.result.canExec).to.be.eq(true);
 
     if (w3fResultCall2.result.canExec == true) {
-      expect(w3fResultCall2.result.callData.length).to.be.eq(10);
-      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("10");
+      expect(w3fResultCall2.result.callData.length).to.be.eq(5);
+      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("5");
     }
 
      
-    storage.nextPromptIndex = "10";
+    storage.nextPromptIndex = "5";
     let w3fResultCall3 = await lensGelatoW3f.run({ userArgs, storage });
     expect(w3fResultCall3.result.canExec).to.be.eq(true);
     if (w3fResultCall3.result.canExec == true) {
     expect(w3fResultCall3.result.callData.length).to.be.eq(5);
     }
-    expect(w3fResultCall3.storage.storage.nextPromptIndex).to.be.eq("0");
+    expect(w3fResultCall3.storage.storage.nextPromptIndex).to.be.eq("10");
 
 
   });
@@ -219,7 +219,7 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
+    lensGelatoW3f = w3f.get("lensChatGPT");
     let w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
     w3fResultCall1.result = w3fResultCall1.result as Web3FunctionResultV2;
 
