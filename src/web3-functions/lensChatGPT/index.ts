@@ -190,36 +190,25 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     });
   }
 
-  const isFirstRun = nextPromptIndex == 0;
-  const isLastRun = callDatas.length < NUMBER_OF_POSTS_PER_RUN;
-
   //only update pagination when not newcomers
   if (!areThereNewProfileIds) {
-    if (callDatas.length == 0) {
-      const getTotalNumberOfProfiles = +(
-        await lensGelatoGpt.getTotalNumberOfProfiles()
-      ).toString();
+    const getTotalNumberOfProfiles = +(
+      await lensGelatoGpt.getTotalNumberOfProfiles()
+    ).toString();
 
-      if (
-        nextPromptIndex + NUMBER_OF_POSTS_PER_RUN <
-        getTotalNumberOfProfiles
-      ) {
-        await storage.set(
-          "nextPromptIndex",
-          (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
-        );
-        return { canExec: false, message: "Skipping empty Profiles" };
-      }
-
-      await storage.set("nextPromptIndex", "0");
-      return { canExec: false, message: "Not Prompts to post" };
-    }
+    const isFirstRun = nextPromptIndex == 0;
+    const isLastRun =
+      (callDatas.length < NUMBER_OF_POSTS_PER_RUN || callDatas.length == 0) &&
+      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN >= getTotalNumberOfProfiles;
 
     if (isFirstRun) {
       await storage.set("lastPostTime", blockTime.toString());
     }
     if (isLastRun) {
       await storage.set("nextPromptIndex", "0");
+      if (callDatas.length == 0) {
+        return { canExec: false, message: "Not Prompts to post" };
+      }
     } else {
       await storage.set(
         "nextPromptIndex",
