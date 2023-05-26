@@ -27,7 +27,7 @@ contract LensGelatoGPT is Proxied {
 
     mapping(uint256 => string) public promptByProfileId;
 
-  
+
     EnumerableSetUpgradeable.UintSet private _profileIds;
     EnumerableSetUpgradeable.UintSet private _newProfileIds;
 

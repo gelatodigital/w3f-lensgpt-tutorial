@@ -3,21 +3,20 @@ import {
   Web3Function,
   Web3FunctionContext,
 } from "@gelatonetwork/web3-functions-sdk";
-import { Contract, BigNumber, utils } from "ethers";
+import { Contract, utils } from "ethers";
 import { Configuration, OpenAIApi } from "openai";
-
 import { v4 as uuidv4 } from "uuid";
 import { Web3Storage, File } from "web3.storage";
-
 import { lensHubAbi } from "../../../helpers/lensHubAbi";
 import {
   LensClient,
   PublicationMainFocus,
   PublicationMetadataDisplayTypes,
-  development,
   production,
 } from "@lens-protocol/client";
 import { promptAbi } from "../../../helpers/promptAbi";
+import { LensGelatoGPT } from "../../../typechain";
+import { PromptStruct } from "../../../typechain/LensGelatoGPT";
 
 Web3Function.onRun(async (context: Web3FunctionContext) => {
   const { userArgs, multiChainProvider, secrets, storage } = context;
@@ -48,25 +47,22 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const network = await provider.getNetwork();
   const chainId = network.chainId;
 
-  const iface = new utils.Interface(lensHubAbi);
-
-  const lensGelatoGptAddress = lensGelatoGPTAddress;
   const lensGelatoGpt = new Contract(
-    lensGelatoGptAddress,
+    lensGelatoGPTAddress,
     promptAbi,
     provider
-  );
+  ) as LensGelatoGPT;
+
+  const iface = new utils.Interface(lensHubAbi);
 
   const areThereNewProfileIds =
     (await lensGelatoGpt.areThereNewProfileIds()) as boolean;
 
   const callDatas: Array<{ to: string; data: string }> = [];
+
   const blockTime = (await provider.getBlock("latest")).timestamp;
 
-  let prompts;
-
   const timeElapsed = blockTime - lastPostTime >= INTERVAL_IN_MIN * 60;
- 
 
   if (!timeElapsed && nextPromptIndex == 0 && !areThereNewProfileIds) {
     return {
@@ -75,24 +71,21 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     };
   }
 
+  let prompts: PromptStruct[] = [];
 
   /// First Post Available newcomers
   if (areThereNewProfileIds) {
     prompts = await lensGelatoGpt.getNewPrompts();
 
-    let profileIds = [];
+    const profileIds = [];
 
-    let i = 0;
-
-    prompts = prompts.slice(0,5);
+    prompts = prompts.slice(0, 5);
 
     for (const prompt of prompts) {
-      i++
       profileIds.push(+prompt[0].toString());
-      console.log(i)
-  
+      console.log(i);
     }
-    console.log(i,93)
+    console.log(i, 93);
     if (profileIds.length > 0) {
       callDatas.push({
         to: lensGelatoGPTAddress,
@@ -103,7 +96,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       });
     }
   } else {
-    
     prompts = await lensGelatoGpt.getPaginatedPrompts(
       nextPromptIndex,
       nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
@@ -113,15 +105,12 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const promptsCleaned = prompts.filter(
     (fil: any) => fil.profileId.toString() != "0"
   ) as Array<string>;
-    console.log(areThereNewProfileIds)
-    console.log(prompts)
+  console.log(areThereNewProfileIds);
+  console.log(prompts);
 
   for (const prompt of promptsCleaned) {
-    
-    let profileId = prompt[0].toString();
+    let profileId = prompt.pro;
     let contentURI = prompt[1].toString();
-
-   
 
     if (chainId == 31337) {
       // In hardhat test, skip ChatGPT call & IPFS publication
@@ -142,7 +131,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       let text = response.data.choices[0].text as string;
 
       if (text != undefined) {
-
         console.log(`Text generated: ${text}`);
         /// Build and validate Publication Metadata
         const uuid = uuidv4();
@@ -209,8 +197,6 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     });
   }
 
-
-
   const isFirstRun = nextPromptIndex == 0;
   const isLastRun = callDatas.length < NUMBER_OF_POSTS_PER_RUN;
 
@@ -227,7 +213,10 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     if (isLastRun) {
       await storage.set("nextPromptIndex", "0");
     } else {
-      await storage.set("nextPromptIndex", (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString());
+      await storage.set(
+        "nextPromptIndex",
+        (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
+      );
     }
   }
   return {
