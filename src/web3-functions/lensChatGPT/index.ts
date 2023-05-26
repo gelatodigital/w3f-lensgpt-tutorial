@@ -68,12 +68,12 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   const blockTime = (await provider.getBlock("latest")).timestamp;
   const isNewInterval = blockTime - lastRunStartTime >= INTERVAL_IN_MIN * 60;
-  const lastRunFinished = nextPromptIndex == 0;
+  const lastIntervalRunFinished = nextPromptIndex == 0;
 
   const isNewcomerRun = await lensGelatoGpt.areThereNewProfileIds();
   const isScheduledRun = !isNewcomerRun && isNewInterval;
 
-  if (lastRunFinished && !isNewcomerRun && !isNewInterval) {
+  if (lastIntervalRunFinished && !isNewcomerRun && !isNewInterval) {
     return {
       canExec: false,
       message:
@@ -212,12 +212,11 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     const totalNumberOfProfiles =
       await lensGelatoGpt.getTotalNumberOfProfiles();
 
-    const isFirstRun = nextPromptIndex == 0;
     const isLastRun =
       nextPromptIndex + NUMBER_OF_POSTS_PER_RUN >=
       totalNumberOfProfiles.toNumber();
 
-    if (isFirstRun) {
+    if (lastIntervalRunFinished) {
       await storage.set("lastRunStartTime", blockTime.toString());
     } else if (isLastRun) {
       await storage.set("nextPromptIndex", "0");
