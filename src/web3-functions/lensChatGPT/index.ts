@@ -83,12 +83,16 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     let profileIds = [];
 
     let i = 0;
+
+    prompts = prompts.slice(0,5);
+
     for (const prompt of prompts) {
       i++
       profileIds.push(+prompt[0].toString());
-      if (i==5) continue;
+      console.log(i)
+  
     }
-
+    console.log(i,93)
     if (profileIds.length > 0) {
       callDatas.push({
         to: lensGelatoGPTAddress,
@@ -99,13 +103,20 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       });
     }
   } else {
+    
     prompts = await lensGelatoGpt.getPaginatedPrompts(
       nextPromptIndex,
       nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
     );
   }
 
-  for (const prompt of prompts) {
+  const promptsCleaned = prompts.filter(
+    (fil: any) => fil.profileId.toString() != "0"
+  ) as Array<string>;
+    console.log(areThereNewProfileIds)
+    console.log(prompts)
+
+  for (const prompt of promptsCleaned) {
     
     let profileId = prompt[0].toString();
     let contentURI = prompt[1].toString();
