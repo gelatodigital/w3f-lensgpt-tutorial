@@ -77,15 +77,10 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   if (areThereNewProfileIds) {
     prompts = await lensGelatoGpt.getNewPrompts();
 
-    const profileIds = [];
+    prompts = prompts.slice(0, NUMBER_OF_POSTS_PER_RUN);
 
-    prompts = prompts.slice(0, 5);
+    const profileIds = prompts.map((map) => map.profileId);
 
-    for (const prompt of prompts) {
-      profileIds.push(+prompt[0].toString());
-      console.log(i);
-    }
-    console.log(i, 93);
     if (profileIds.length > 0) {
       callDatas.push({
         to: lensGelatoGPTAddress,
@@ -103,14 +98,12 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   }
 
   const promptsCleaned = prompts.filter(
-    (fil: any) => fil.profileId.toString() != "0"
-  ) as Array<string>;
-  console.log(areThereNewProfileIds);
-  console.log(prompts);
+    (fil: PromptStruct) => fil.profileId.toString() != "0"
+  ) as Array<PromptStruct>;
 
   for (const prompt of promptsCleaned) {
-    let profileId = prompt.pro;
-    let contentURI = prompt[1].toString();
+    const profileId = prompt.profileId;
+    let contentURI = prompt.prompt;
 
     if (chainId == 31337) {
       // In hardhat test, skip ChatGPT call & IPFS publication
@@ -128,7 +121,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
         frequency_penalty: 1.5,
         presence_penalty: 1,
       });
-      let text = response.data.choices[0].text as string;
+      const text = response.data.choices[0].text as string;
 
       if (text != undefined) {
         console.log(`Text generated: ${text}`);
@@ -203,6 +196,21 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   //only update pagination when not newcomers
   if (!areThereNewProfileIds) {
     if (callDatas.length == 0) {
+      const getTotalNumberOfProfiles = +(
+        await lensGelatoGpt.getTotalNumberOfProfiles()
+      ).toString();
+
+      if (
+        nextPromptIndex + NUMBER_OF_POSTS_PER_RUN <
+        getTotalNumberOfProfiles
+      ) {
+        await storage.set(
+          "nextPromptIndex",
+          (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
+        );
+        return { canExec: false, message: "Skipping empty Profiles" };
+      }
+
       await storage.set("nextPromptIndex", "0");
       return { canExec: false, message: "Not Prompts to post" };
     }

@@ -27,7 +27,6 @@ contract LensGelatoGPT is Proxied {
 
     mapping(uint256 => string) public promptByProfileId;
 
-
     EnumerableSetUpgradeable.UintSet private _profileIds;
     EnumerableSetUpgradeable.UintSet private _newProfileIds;
 
@@ -150,6 +149,10 @@ contract LensGelatoGPT is Proxied {
 
     function getNewProfileIds() external view returns (uint256[] memory) {
         return _newProfileIds.values();
+    }
+
+    function getTotalNumberOfProfiles() external view returns (uint256) {
+        return _profileIds.length();
     }
 
     function areThereNewProfileIds() external view returns (bool) {
