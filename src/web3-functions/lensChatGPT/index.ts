@@ -17,7 +17,6 @@ import {
 import { promptAbi } from "../../../helpers/promptAbi";
 import { LensGelatoGPT } from "../../../typechain";
 import { PromptStructOutput } from "../../../typechain/LensGelatoGPT";
-import { ethers } from "hardhat";
 
 Web3Function.onRun(async (context: Web3FunctionContext) => {
   const { userArgs, multiChainProvider, secrets, storage } = context;
@@ -39,9 +38,9 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const lensHubAddress = userArgs.lensHubAddress as string;
   const collectModuleAddress = userArgs.collectModule as string;
   if (
-    !ethers.utils.isAddress(lensGelatoGPTAddress) ||
-    !ethers.utils.isAddress(lensHubAddress) ||
-    !ethers.utils.isAddress(collectModuleAddress)
+    !utils.isAddress(lensGelatoGPTAddress) ||
+    !utils.isAddress(lensHubAddress) ||
+    !utils.isAddress(collectModuleAddress)
   ) {
     console.error("Error: Invalid address userArgs");
     return {
@@ -120,6 +119,8 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     const { chainId } = await provider.getNetwork();
 
     // // In hardhat test, skip ChatGPT call & IPFS publication
+    let contentURI;
+
     if (chainId != 31337) {
       // Get Sentence OpenAi
       let text: string | undefined = undefined;
@@ -185,26 +186,27 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
         };
       }
 
-      const contentURI = `https://${cid}.ipfs.w3s.link/publication.json`;
+      contentURI = `https://${cid}.ipfs.w3s.link/publication.json`;
 
       console.log(`Publication IPFS: ${contentURI}`);
-
-      const postData = {
-        profileId: prompt.profileId,
-        contentURI,
-        collectModule: collectModuleAddress, //collect Module
-        collectModuleInitData: "0x",
-        referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
-        referenceModuleInitData: "0x",
-      };
-
-      const iface = new utils.Interface(lensHubAbi);
-
-      callDatas.push({
-        to: lensHubAddress,
-        data: iface.encodeFunctionData("post", [postData]),
-      });
+    } else {
+      contentURI = prompt.prompt;
     }
+    const postData = {
+      profileId: prompt.profileId,
+      contentURI,
+      collectModule: collectModuleAddress, //collect Module
+      collectModuleInitData: "0x",
+      referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
+      referenceModuleInitData: "0x",
+    };
+
+    const iface = new utils.Interface(lensHubAbi);
+
+    callDatas.push({
+      to: lensHubAddress,
+      data: iface.encodeFunctionData("post", [postData]),
+    });
   }
 
   // Process storage updates only for scheduled runs
