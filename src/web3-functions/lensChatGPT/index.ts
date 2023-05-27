@@ -50,7 +50,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   }
 
   const NUMBER_OF_POSTS_PER_RUN = 5;
-  const INTERVAL_IN_MIN = 240;
+  const INTERVAL_IN_MIN = 480;
 
   const lastRunStartTime = parseInt(
     (await storage.get("lastRunStartTime")) ?? "0"
@@ -130,7 +130,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
         );
         const response = await openai.createCompletion({
           model: "text-davinci-003",
-          prompt: ` ${prompt.prompt} in less than 15 words.`,
+          prompt: ` ${prompt.prompt} in less than 50 words.`,
           temperature: 1,
           max_tokens: 256,
           top_p: 1,
@@ -242,7 +242,7 @@ const getLensPublicationMetaData = (_text: string) => {
   return {
     version: "2.0.0",
     metadata_id: uuidv4(),
-    content: _text,
+    content: `${_text} \n\n #lensgpt #gelatonetwork`,
     external_url: "https://lenster.xyz/",
     image: null,
     imageMimeType: null,
