@@ -6,7 +6,7 @@ import {
 import { Contract, utils } from "ethers";
 import { Configuration, OpenAIApi } from "openai";
 import { v4 as uuidv4 } from "uuid";
-import { Web3Storage, File } from "web3.storage";
+import { Web3Storage, File, CIDString } from "web3.storage";
 import { lensHubAbi } from "../../../helpers/lensHubAbi";
 import {
   LensClient,
@@ -16,7 +16,8 @@ import {
 } from "@lens-protocol/client";
 import { promptAbi } from "../../../helpers/promptAbi";
 import { LensGelatoGPT } from "../../../typechain";
-import { PromptStruct } from "../../../typechain/LensGelatoGPT";
+import { PromptStructOutput } from "../../../typechain/LensGelatoGPT";
+import { ethers } from "hardhat";
 
 Web3Function.onRun(async (context: Web3FunctionContext) => {
   const { userArgs, multiChainProvider, secrets, storage } = context;
@@ -24,28 +25,40 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   // User Secrets
   const WEB3_STORAGE_API_KEY = await secrets.get("WEB3_STORAGE_API_KEY");
-  if (!WEB3_STORAGE_API_KEY)
-    throw new Error("Missing secrets.WEB3_STORAGE_API_KEY");
-
   const SECRETS_OPEN_AI_API_KEY = await secrets.get("OPEN_AI_API_KEY");
-  if (!SECRETS_OPEN_AI_API_KEY)
-    throw new Error("Missing secrets.OPEN_AI_API_KEY");
+  if (!WEB3_STORAGE_API_KEY || !SECRETS_OPEN_AI_API_KEY) {
+    console.error("Error: Missing secrets");
+    return {
+      canExec: false,
+      message: "Error: Missing Secrets",
+    };
+  }
 
-  const lensGelatoGPTAddress = (userArgs.lensGelatoGPT as string) ?? "";
-  const lensHubAddress = (userArgs.lensHubAddress as string) ?? "";
-  const collectModuleAddress = (userArgs.collectModule as string) ?? "";
+  // User userArgs
+  const lensGelatoGPTAddress = userArgs.lensGelatoGPT as string;
+  const lensHubAddress = userArgs.lensHubAddress as string;
+  const collectModuleAddress = userArgs.collectModule as string;
+  if (
+    !ethers.utils.isAddress(lensGelatoGPTAddress) ||
+    !ethers.utils.isAddress(lensHubAddress) ||
+    !ethers.utils.isAddress(collectModuleAddress)
+  ) {
+    console.error("Error: Invalid address userArgs");
+    return {
+      canExec: false,
+      message: "Error: Invalid address userArgs",
+    };
+  }
 
   const NUMBER_OF_POSTS_PER_RUN = 5;
   const INTERVAL_IN_MIN = 240;
 
-  const lastPostTime = parseInt((await storage.get("lastPostTime")) ?? "0");
-
+  const lastRunStartTime = parseInt(
+    (await storage.get("lastRunStartTime")) ?? "0"
+  );
   const nextPromptIndex = parseInt(
     (await storage.get("nextPromptIndex")) ?? "0"
   );
-
-  const network = await provider.getNetwork();
-  const chainId = network.chainId;
 
   const lensGelatoGpt = new Contract(
     lensGelatoGPTAddress,
@@ -53,162 +66,160 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     provider
   ) as LensGelatoGPT;
 
-  const iface = new utils.Interface(lensHubAbi);
+  const blockTime = (await provider.getBlock("latest")).timestamp;
+  const isNewInterval = blockTime - lastRunStartTime >= INTERVAL_IN_MIN * 60;
+  const lastIntervalRunFinished = nextPromptIndex == 0;
 
-  const areThereNewProfileIds =
-    (await lensGelatoGpt.areThereNewProfileIds()) as boolean;
+  const isNewcomerRun = await lensGelatoGpt.areThereNewProfileIds();
+  const isScheduledRun = !isNewcomerRun && isNewInterval;
+
+  if (lastIntervalRunFinished && !isNewcomerRun && !isNewInterval) {
+    return {
+      canExec: false,
+      message:
+        "Last run finished, but not newcomers, nor interval wait finished",
+    };
+  }
+
+  const prompts: PromptStructOutput[] = [];
 
   const callDatas: Array<{ to: string; data: string }> = [];
 
-  const blockTime = (await provider.getBlock("latest")).timestamp;
+  if (isNewcomerRun) {
+    const allNewPrompts = await lensGelatoGpt.getNewPrompts();
+    const firstSliceOfNewPrompts = allNewPrompts.slice(
+      0,
+      NUMBER_OF_POSTS_PER_RUN
+    );
 
-  const timeElapsed = blockTime - lastPostTime >= INTERVAL_IN_MIN * 60;
+    // Add call to remove firstSliceOfNewPrompts
+    // Assumption: in next run, the firstSliceOfNewPrompts will be the next ones
+    const profileIds = firstSliceOfNewPrompts.map((map) => map.profileId);
+    callDatas.push({
+      to: lensGelatoGPTAddress,
+      data: lensGelatoGpt.interface.encodeFunctionData("removeNewProfileIds", [
+        profileIds,
+      ]),
+    });
 
-  if (!timeElapsed && nextPromptIndex == 0 && !areThereNewProfileIds) {
-    return {
-      canExec: false,
-      message: "Not time elapsed since last post and not newcomers",
-    };
-  }
-
-  let prompts: PromptStruct[] = [];
-
-  /// First Post Available newcomers
-  if (areThereNewProfileIds) {
-    prompts = await lensGelatoGpt.getNewPrompts();
-
-    prompts = prompts.slice(0, NUMBER_OF_POSTS_PER_RUN);
-
-    const profileIds = prompts.map((map) => map.profileId);
-
-    if (profileIds.length > 0) {
-      callDatas.push({
-        to: lensGelatoGPTAddress,
-        data: lensGelatoGpt.interface.encodeFunctionData(
-          "removeNewProfileIds",
-          [profileIds]
-        ),
-      });
-    }
+    prompts.push(...firstSliceOfNewPrompts);
   } else {
-    prompts = await lensGelatoGpt.getPaginatedPrompts(
-      nextPromptIndex,
-      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
+    prompts.push(
+      ...(await lensGelatoGpt.getPaginatedPrompts(
+        nextPromptIndex,
+        nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
+      ))
     );
   }
 
-  const promptsCleaned = prompts.filter(
-    (fil: PromptStruct) => fil.profileId.toString() != "0"
-  ) as Array<PromptStruct>;
+  const nonEmptyPrompts = prompts.filter(
+    (prompt) => prompt.profileId.toString() !== "0"
+  );
 
-  for (const prompt of promptsCleaned) {
-    const profileId = prompt.profileId;
-    let contentURI = prompt.prompt;
+  for (const prompt of nonEmptyPrompts) {
+    const { chainId } = await provider.getNetwork();
 
-    if (chainId == 31337) {
-      // In hardhat test, skip ChatGPT call & IPFS publication
-    } else {
+    // // In hardhat test, skip ChatGPT call & IPFS publication
+    if (chainId != 31337) {
       // Get Sentence OpenAi
-      const openai = new OpenAIApi(
-        new Configuration({ apiKey: SECRETS_OPEN_AI_API_KEY })
-      );
-      const response = await openai.createCompletion({
-        model: "text-davinci-003",
-        prompt: ` ${contentURI} in less than 15 words.`,
-        temperature: 1,
-        max_tokens: 256,
-        top_p: 1,
-        frequency_penalty: 1.5,
-        presence_penalty: 1,
-      });
-      const text = response.data.choices[0].text as string;
-
-      if (text != undefined) {
-        console.log(`Text generated: ${text}`);
-        /// Build and validate Publication Metadata
-        const uuid = uuidv4();
-        const pub = {
-          version: "2.0.0",
-          metadata_id: uuid,
-          content: text,
-          external_url: "https://lenster.xyz/",
-          image: null,
-          imageMimeType: null,
-          name: "Post by GelatoGPT",
-          tags: [],
-          animation_url: null,
-          mainContentFocus: PublicationMainFocus.TextOnly,
-          contentWarning: null,
-          attributes: [
-            {
-              traitType: "type",
-              displayType: PublicationMetadataDisplayTypes.String,
-              value: "text_only",
-            },
-          ],
-          media: [],
-          locale: "en-GB",
-          appId: "Lenster",
-        };
-
-        // Checking Metadata is Correct
-        const lensClient = new LensClient({
-          environment: production,
+      let text: string | undefined = undefined;
+      try {
+        const openai = new OpenAIApi(
+          new Configuration({ apiKey: SECRETS_OPEN_AI_API_KEY })
+        );
+        const response = await openai.createCompletion({
+          model: "text-davinci-003",
+          prompt: ` ${prompt.prompt} in less than 15 words.`,
+          temperature: 1,
+          max_tokens: 256,
+          top_p: 1,
+          frequency_penalty: 1.5,
+          presence_penalty: 1,
         });
+        text = response.data.choices[0].text as string;
+        if (text === undefined) {
+          console.error(`Error: OpenAI: NO TEXT`);
+          return { canExec: false, message: "Error: OpenAI: NO TEXT" };
+        }
+      } catch (error) {
+        console.error(`Error: OpenAI: ${error}`);
+        return { canExec: false, message: "Error: OpenAI" };
+      }
+
+      console.log(`Text generated: ${text}`);
+
+      // Get Lens Metadata and validate
+      const pub = getLensPublicationMetaData(text);
+      const lensClient = new LensClient({
+        environment: production,
+      });
+
+      try {
         const validateResult = await lensClient.publication.validateMetadata(
           pub
         );
-
         if (!validateResult.valid) {
-          throw new Error(`Metadata is not valid.`);
+          console.error(`Error: Metadata is not valid.`);
+          return { canExec: false, message: "LensClient: Metadata invalid" };
         }
-
-        // Upload metadata to IPFS
-        const storage = new Web3Storage({ token: WEB3_STORAGE_API_KEY! });
-        const myFile = new File([JSON.stringify(pub)], "publication.json");
-        const cid = await storage.put([myFile]);
-        contentURI = `https://${cid}.ipfs.w3s.link/publication.json`;
-
-        console.log(`Publication IPFS: ${contentURI}`);
-      } else {
-        return { canExec: false, message: "No OpenAi text" };
+      } catch (error) {
+        console.error(`Error: lensClient validateMetadata`);
+        return {
+          canExec: false,
+          message: "Error: lensClient validateMetadata",
+        };
       }
+
+      // Upload metadata to IPFS
+      const storage = new Web3Storage({ token: WEB3_STORAGE_API_KEY });
+      const myFile = new File([JSON.stringify(pub)], "publication.json");
+
+      let cid: CIDString;
+      try {
+        cid = await storage.put([myFile]);
+      } catch (error) {
+        console.error(`Error: Web3Storage`);
+        return {
+          canExec: false,
+          message: "Error: Web3Storage: validateMetadata",
+        };
+      }
+
+      const contentURI = `https://${cid}.ipfs.w3s.link/publication.json`;
+
+      console.log(`Publication IPFS: ${contentURI}`);
+
+      const postData = {
+        profileId: prompt.profileId,
+        contentURI,
+        collectModule: collectModuleAddress, //collect Module
+        collectModuleInitData: "0x",
+        referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
+        referenceModuleInitData: "0x",
+      };
+
+      const iface = new utils.Interface(lensHubAbi);
+
+      callDatas.push({
+        to: lensHubAddress,
+        data: iface.encodeFunctionData("post", [postData]),
+      });
     }
-
-    const postData = {
-      profileId: profileId,
-      contentURI: contentURI,
-      collectModule: collectModuleAddress, //collect Module
-      collectModuleInitData: "0x",
-      referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
-      referenceModuleInitData: "0x",
-    };
-
-    callDatas.push({
-      to: lensHubAddress,
-      data: iface.encodeFunctionData("post", [postData]),
-    });
   }
 
-  //only update pagination when not newcomers
-  if (!areThereNewProfileIds) {
-    const getTotalNumberOfProfiles = +(
-      await lensGelatoGpt.getTotalNumberOfProfiles()
-    ).toString();
+  // Process storage updates only for scheduled runs
+  if (isScheduledRun) {
+    const totalNumberOfProfiles =
+      await lensGelatoGpt.getTotalNumberOfProfiles();
 
-    const isFirstRun = nextPromptIndex == 0;
     const isLastRun =
-      (callDatas.length < NUMBER_OF_POSTS_PER_RUN || callDatas.length == 0) &&
-      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN >= getTotalNumberOfProfiles;
+      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN >=
+      totalNumberOfProfiles.toNumber();
 
-    if (isFirstRun) {
-      await storage.set("lastPostTime", blockTime.toString());
-    }
-    if (isLastRun) {
+    if (lastIntervalRunFinished) {
+      await storage.set("lastRunStartTime", blockTime.toString());
+    } else if (isLastRun) {
       await storage.set("nextPromptIndex", "0");
-      if (callDatas.length == 0) {
-        return { canExec: false, message: "Not Prompts to post" };
-      }
     } else {
       await storage.set(
         "nextPromptIndex",
@@ -216,8 +227,37 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       );
     }
   }
-  return {
-    canExec: true,
-    callData: callDatas,
-  };
+
+  return callDatas.length == 0
+    ? { canExec: false, message: "Not Prompts to post" }
+    : {
+        canExec: true,
+        callData: callDatas,
+      };
 });
+
+const getLensPublicationMetaData = (_text: string) => {
+  return {
+    version: "2.0.0",
+    metadata_id: uuidv4(),
+    content: _text,
+    external_url: "https://lenster.xyz/",
+    image: null,
+    imageMimeType: null,
+    name: "Post by GelatoGPT",
+    tags: [],
+    animation_url: null,
+    mainContentFocus: PublicationMainFocus.TextOnly,
+    contentWarning: null,
+    attributes: [
+      {
+        traitType: "type",
+        displayType: PublicationMetadataDisplayTypes.String,
+        value: "text_only",
+      },
+    ],
+    media: [],
+    locale: "en-GB",
+    appId: "Lenster",
+  };
+};

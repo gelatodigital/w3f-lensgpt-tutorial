@@ -30,11 +30,6 @@ contract LensGelatoGPT is Proxied {
     EnumerableSetUpgradeable.UintSet private _profileIds;
     EnumerableSetUpgradeable.UintSet private _newProfileIds;
 
-    constructor(ILensHub _lensHub, address _dedicatedMsgSender) {
-        lensHub = _lensHub;
-        dedicatedMsgSender = _dedicatedMsgSender;
-    }
-
     modifier onlyProfileOwner(uint256 _profileId) {
         require(
             msg.sender == lensHub.ownerOf(_profileId),
@@ -49,6 +44,11 @@ contract LensGelatoGPT is Proxied {
             "LensGelatoGPT.onlyDedicatedMsgSender"
         );
         _;
+    }
+
+    constructor(ILensHub _lensHub, address _dedicatedMsgSender) {
+        lensHub = _lensHub;
+        dedicatedMsgSender = _dedicatedMsgSender;
     }
 
     function setFee(uint256 _fee) external onlyProxyAdmin {
