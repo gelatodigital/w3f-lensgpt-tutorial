@@ -1,15 +1,13 @@
 import { Signer } from "@ethersproject/abstract-signer";
-import { AddressZero } from "@ethersproject/constants";
 import {
-  time as blockTime,
   impersonateAccount,
   setBalance,
 } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import { BigNumber, Contract } from "ethers";
+import { Contract, constants } from "ethers";
 import hre, { deployments, ethers, w3f } from "hardhat";
 import { LensGelatoGPT, ILensHub } from "../typechain";
-import { lens_hub_abi } from "../helpers/lens_hub_abi";
+import { lensHubAbi } from "../helpers/lensHubAbi";
 import {
   Web3FunctionUserArgs,
   Web3FunctionResultV2,
@@ -19,8 +17,6 @@ import { mockProfiles } from "./helpers/MockProfiles";
 import { parseEther } from "ethers/lib/utils";
 
 const FIRST_SENTENCE = "fist sentence";
-const LONG_SENTENCE =
-  "long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece long sentece";
 
 describe("W3F", function () {
   let admin: Signer; // proxyAdmin
@@ -64,7 +60,7 @@ describe("W3F", function () {
       ).address
     )) as LensGelatoGPT;
 
-    lensHub = new Contract(lensHubAddress, lens_hub_abi, admin) as ILensHub;
+    lensHub = new Contract(lensHubAddress, lensHubAbi, admin) as ILensHub;
     firstProfileAddress = await lensHub.ownerOf(1);
     await impersonateAccount(firstProfileAddress);
     firstProfile = await ethers.getSigner(firstProfileAddress);
@@ -89,14 +85,14 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
+    lensGelatoW3f = w3f.get("lensChatGPT");
     let { result } = await lensGelatoW3f.run({ userArgs, storage });
     result = result as Web3FunctionResultV2;
 
     expect(result.canExec).to.be.eq(true);
 
     if (result.canExec == true) {
-      expect(result.callData.length).to.be.eq(1);
+      expect(result.callData.length).to.be.eq(2);
     }
   });
 
@@ -113,7 +109,7 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
+    lensGelatoW3f = w3f.get("lensChatGPT");
     let { result } = await lensGelatoW3f.run({ userArgs, storage });
     result = result as Web3FunctionResultV2;
 
@@ -125,9 +121,9 @@ describe("W3F", function () {
         value: ethers.utils.parseEther("1"),
         gasLimit: 10000000,
       });
-      let data = result.callData[0];
+      const data = result.callData[1];
       await impersonateAccount(dedicatedMsgSenderAddress);
-      let dedicatedMsgSenderSigner = await ethers.getSigner(
+      const dedicatedMsgSenderSigner = await ethers.getSigner(
         dedicatedMsgSenderAddress
       );
       await dedicatedMsgSenderSigner.sendTransaction({
@@ -142,10 +138,8 @@ describe("W3F", function () {
     }
   });
 
-  it("W3F executes query properly 15", async () => {
-    await setBalance(adminAddress, parseEther("1000"));
-
-    await mockProfiles(15, {
+  it("W3F executes query properly 5", async () => {
+    await mockProfiles(1, 5, {
       admin,
       dedicatedMsgSenderAddress,
       hre,
@@ -158,29 +152,20 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
-    let w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
+    lensGelatoW3f = w3f.get("lensChatGPT");
+    const w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
     w3fResultCall1.result = w3fResultCall1.result as Web3FunctionResultV2;
 
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(10);
-      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("10");
-    }
-
-    storage.nextPromptIndex = "10";
-    let w3fResultCall2 = await lensGelatoW3f.run({ userArgs, storage });
-    expect(w3fResultCall2.result.canExec).to.be.eq(true);
-
-    if (w3fResultCall2.result.canExec == true) {
-      expect(w3fResultCall2.result.callData.length).to.be.eq(5);
-      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
+      expect(w3fResultCall1.result.callData.length).to.be.eq(6);
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
     }
   });
 
-  it("W3F executes query properly 10", async () => {
-    await mockProfiles(10, {
+  it("W3F executes query properly 10 with wrong dispatcher", async () => {
+    await mockProfiles(1, 10, {
       admin,
       dedicatedMsgSenderAddress,
       hre,
@@ -193,20 +178,77 @@ describe("W3F", function () {
       lastPostTime: "0",
     };
 
-    lensGelatoW3f = w3f.get("lens-ai");
-    let w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
+    const fourthProfileAddress = await lensHub.ownerOf(4);
+    await impersonateAccount(fourthProfileAddress);
+    const fourthProfile = await ethers.getSigner(fourthProfileAddress);
+    await lensHub
+      .connect(fourthProfile)
+      .setDispatcher(4, constants.AddressZero);
+
+    lensGelatoW3f = w3f.get("lensChatGPT");
+    const w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
     w3fResultCall1.result = w3fResultCall1.result as Web3FunctionResultV2;
 
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(10);
-      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("10");
+      expect(w3fResultCall1.result.callData.length).to.be.eq(5);
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
+    }
+  });
+
+  it("W3F executes query properly 15", async () => {
+    await setBalance(adminAddress, parseEther("1000"));
+
+    await mockProfiles(1, 15, {
+      admin,
+      dedicatedMsgSenderAddress,
+      hre,
+      lensGelatoGPT,
+      lensHub,
+    });
+
+    const storage = {
+      nextPromptIndex: "0",
+      lastPostTime: "0",
+    };
+
+    lensGelatoW3f = w3f.get("lensChatGPT");
+    const w3fResultCall1 = await lensGelatoW3f.run({ userArgs, storage });
+    w3fResultCall1.result = w3fResultCall1.result as Web3FunctionResultV2;
+
+    expect(w3fResultCall1.result.canExec).to.be.eq(true);
+
+    if (w3fResultCall1.result.canExec == true) {
+      expect(w3fResultCall1.result.callData.length).to.be.eq(6);
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
+
+      await setBalance(dedicatedMsgSenderAddress, parseEther("1"));
+      await impersonateAccount(dedicatedMsgSenderAddress);
+      const dedicatedMsgSenderSigner = await ethers.getSigner(
+        dedicatedMsgSenderAddress
+      );
+
+      await dedicatedMsgSenderSigner.sendTransaction({
+        to: w3fResultCall1.result.callData[0].to,
+        data: w3fResultCall1.result.callData[0].data,
+      });
     }
 
-    storage.nextPromptIndex = "10";
-    let w3fResultCall2 = await lensGelatoW3f.run({ userArgs, storage });
-    expect(w3fResultCall2.result.canExec).to.be.eq(false);
-    expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
+    const w3fResultCall2 = await lensGelatoW3f.run({ userArgs, storage });
+
+    expect(w3fResultCall2.result.canExec).to.be.eq(true);
+
+    if (w3fResultCall2.result.canExec == true) {
+      expect(w3fResultCall2.result.callData.length).to.be.eq(6);
+      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
+    }
+
+    const w3fResultCall3 = await lensGelatoW3f.run({ userArgs, storage });
+    expect(w3fResultCall3.result.canExec).to.be.eq(true);
+    if (w3fResultCall3.result.canExec == true) {
+      expect(w3fResultCall3.result.callData.length).to.be.eq(6);
+    }
+    expect(w3fResultCall3.storage.storage.nextPromptIndex).to.be.eq("0");
   });
 });
