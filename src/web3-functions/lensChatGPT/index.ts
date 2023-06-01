@@ -3,7 +3,7 @@ import {
   Web3Function,
   Web3FunctionContext,
 } from "@gelatonetwork/web3-functions-sdk";
-import { Contract, utils } from "ethers";
+import { BigNumber, Contract, utils } from "ethers";
 import { Configuration, OpenAIApi } from "openai";
 import { v4 as uuidv4 } from "uuid";
 import { Web3Storage, File, CIDString } from "web3.storage";
@@ -24,8 +24,8 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   // User Secrets
   const WEB3_STORAGE_API_KEY = await secrets.get("WEB3_STORAGE_API_KEY");
-  const SECRETS_OPEN_AI_API_KEY = await secrets.get("OPEN_AI_API_KEY");
-  if (!WEB3_STORAGE_API_KEY || !SECRETS_OPEN_AI_API_KEY) {
+  const OPEN_AI_API_KEY = await secrets.get("OPEN_AI_API_KEY");
+  if (!WEB3_STORAGE_API_KEY || !OPEN_AI_API_KEY) {
     console.error("Error: Missing secrets");
     return {
       canExec: false,
@@ -49,7 +49,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     };
   }
 
-  const NUMBER_OF_POSTS_PER_RUN = 5;
+  const NUMBER_OF_POSTS_PER_RUN = 10;
   const INTERVAL_IN_MIN = 480;
 
   const lastRunStartTime = parseInt(
@@ -115,98 +115,44 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
     (prompt) => prompt.profileId.toString() !== "0"
   );
 
-  for (const prompt of nonEmptyPrompts) {
-    const { chainId } = await provider.getNetwork();
+  const { chainId } = await provider.getNetwork();
+  const isTest = chainId == 31337;
 
-    // // In hardhat test, skip ChatGPT call & IPFS publication
-    let contentURI;
+  const profileIdsArray = nonEmptyPrompts.map((prompt) => prompt.profileId);
+  let contentURIArray: string[];
 
-    if (chainId != 31337) {
-      // Get Sentence OpenAi
-      let text: string | undefined = undefined;
-      try {
-        const openai = new OpenAIApi(
-          new Configuration({ apiKey: SECRETS_OPEN_AI_API_KEY })
-        );
-        const response = await openai.createCompletion({
-          model: "text-davinci-003",
-          prompt: ` ${prompt.prompt} in less than 50 words.`,
-          temperature: 1,
-          max_tokens: 256,
-          top_p: 1,
-          frequency_penalty: 1.5,
-          presence_penalty: 1,
-        });
-        text = response.data.choices[0].text as string;
-        if (text === undefined) {
-          console.error(`Error: OpenAI: NO TEXT`);
-          return { canExec: false, message: "Error: OpenAI: NO TEXT" };
-        }
-      } catch (error) {
-        console.error(`Error: OpenAI: ${error}`);
-        return { canExec: false, message: "Error: OpenAI" };
-      }
-
-      console.log(`Text generated: ${text}`);
-
-      // Get Lens Metadata and validate
-      const pub = getLensPublicationMetaData(text);
-      const lensClient = new LensClient({
-        environment: production,
-      });
-
-      try {
-        const validateResult = await lensClient.publication.validateMetadata(
-          pub
-        );
-        if (!validateResult.valid) {
-          console.error(`Error: Metadata is not valid.`);
-          return { canExec: false, message: "LensClient: Metadata invalid" };
-        }
-      } catch (error) {
-        console.error(`Error: lensClient validateMetadata`);
-        return {
-          canExec: false,
-          message: "Error: lensClient validateMetadata",
-        };
-      }
-
-      // Upload metadata to IPFS
-      const storage = new Web3Storage({ token: WEB3_STORAGE_API_KEY });
-      const myFile = new File([JSON.stringify(pub)], "publication.json");
-
-      let cid: CIDString;
-      try {
-        cid = await storage.put([myFile]);
-      } catch (error) {
-        console.error(`Error: Web3Storage`);
-        return {
-          canExec: false,
-          message: "Error: Web3Storage: validateMetadata",
-        };
-      }
-
-      contentURI = `https://${cid}.ipfs.w3s.link/publication.json`;
-
-      console.log(`Publication IPFS: ${contentURI}`);
-    } else {
-      contentURI = prompt.prompt;
+  if (!isTest) {
+    // Get Sentence OpenAi only if not in test
+    const parallelCalls = nonEmptyPrompts.map((prompt) =>
+      getLensData(prompt.prompt, OPEN_AI_API_KEY, WEB3_STORAGE_API_KEY)
+    );
+    const parallelCallsResult = await Promise.all(parallelCalls);
+    const errorIndex = parallelCallsResult.findIndex(
+      (error) => error.canExec == false
+    );
+    if (errorIndex !== -1) {
+      return parallelCallsResult[errorIndex] as {
+        canExec: false;
+        message: string;
+      };
     }
-    const postData = {
-      profileId: prompt.profileId,
-      contentURI,
-      collectModule: collectModuleAddress, //collect Module
-      collectModuleInitData: "0x",
-      referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
-      referenceModuleInitData: "0x",
-    };
+    contentURIArray = parallelCallsResult.map(
+      (parallelCall) =>
+        (parallelCall as { canExec: true; contentURI: string }).contentURI
+    );
+  } else {
+    // DON't get Sentence OpenAi when in Test
+    contentURIArray = nonEmptyPrompts.map((prompt) => prompt.prompt);
+  }
 
-    const iface = new utils.Interface(lensHubAbi);
-
-    callDatas.push({
-      to: lensHubAddress,
-      data: iface.encodeFunctionData("post", [postData]),
-    });
+  for (let i = 0; i < profileIdsArray.length; i++) {
+    const postCallData = buildPostCallData(
+      profileIdsArray[i],
+      contentURIArray[i],
+      collectModuleAddress,
+      lensHubAddress
+    );
+    callDatas.push(postCallData);
   }
 
   // Process storage updates only for scheduled runs
@@ -237,6 +183,99 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
         callData: callDatas,
       };
 });
+
+const buildPostCallData = (
+  _profileId: BigNumber,
+  _contentURI: string,
+  _collectModuleAddress: string,
+  _lensHubAddress: string
+) => {
+  const postData = {
+    profileId: _profileId,
+    contentURI: _contentURI,
+    collectModule: _collectModuleAddress, //collect Module
+    collectModuleInitData: "0x",
+    referenceModule: "0x0000000000000000000000000000000000000000", // reference Module
+    referenceModuleInitData: "0x",
+  };
+
+  const lensIface = new utils.Interface(lensHubAbi);
+
+  return {
+    to: _lensHubAddress,
+    data: lensIface.encodeFunctionData("post", [postData]),
+  };
+};
+
+const getLensData = async (
+  _text: string,
+  openAiKey: string,
+  web3StorageKey: string
+): Promise<
+  { canExec: false; message: string } | { canExec: true; contentURI: string }
+> => {
+  try {
+    const openai = new OpenAIApi(new Configuration({ apiKey: openAiKey }));
+    const response = await openai.createCompletion({
+      model: "text-davinci-003",
+      prompt: ` ${_text} in less than 50 words.`,
+      temperature: 1,
+      max_tokens: 256,
+      top_p: 1,
+      frequency_penalty: 1.5,
+      presence_penalty: 1,
+    });
+    const openAiText = response.data.choices[0].text as string;
+    if (openAiText === undefined) {
+      console.error(`Error: OpenAI: NO TEXT`);
+      return { canExec: false, message: "Error: OpenAI: NO TEXT" };
+    }
+    console.log(`Text generated: ${openAiText}`);
+  } catch (error) {
+    console.error(`Error: OpenAI: ${error}`);
+    return { canExec: false, message: "Error: OpenAI" };
+  }
+
+  // Get Lens Metadata and validate
+  const pub = getLensPublicationMetaData(_text);
+  const lensClient = new LensClient({
+    environment: production,
+  });
+
+  try {
+    const validateResult = await lensClient.publication.validateMetadata(pub);
+    if (!validateResult.valid) {
+      console.error(`Error: Metadata is not valid.`);
+      return { canExec: false, message: "LensClient: Metadata invalid" };
+    }
+  } catch (error) {
+    console.error(`Error: lensClient validateMetadata`);
+    return {
+      canExec: false,
+      message: "Error: lensClient validateMetadata",
+    };
+  }
+
+  // Upload metadata to IPFS
+  const storage = new Web3Storage({ token: web3StorageKey });
+  const myFile = new File([JSON.stringify(pub)], "publication.json");
+
+  let cid: CIDString;
+  try {
+    cid = await storage.put([myFile]);
+  } catch (error) {
+    console.error(`Error: Web3Storage`);
+    return {
+      canExec: false,
+      message: "Error: Web3Storage: validateMetadata",
+    };
+  }
+
+  return {
+    canExec: true,
+    contentURI: `https://${cid}.ipfs.w3s.link/publication.json`,
+  };
+};
 
 const getLensPublicationMetaData = (_text: string) => {
   return {
