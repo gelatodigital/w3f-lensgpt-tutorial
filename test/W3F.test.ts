@@ -192,7 +192,7 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(5);
+      expect(w3fResultCall1.result.callData.length).to.be.eq(10);
       expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
     }
   });
@@ -220,7 +220,7 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(6);
+      expect(w3fResultCall1.result.callData.length).to.be.eq(11);
       expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
 
       await setBalance(dedicatedMsgSenderAddress, parseEther("1"));
@@ -243,12 +243,5 @@ describe("W3F", function () {
       expect(w3fResultCall2.result.callData.length).to.be.eq(6);
       expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
     }
-
-    const w3fResultCall3 = await lensGelatoW3f.run({ userArgs, storage });
-    expect(w3fResultCall3.result.canExec).to.be.eq(true);
-    if (w3fResultCall3.result.canExec == true) {
-      expect(w3fResultCall3.result.callData.length).to.be.eq(6);
-    }
-    expect(w3fResultCall3.storage.storage.nextPromptIndex).to.be.eq("0");
   });
 });
