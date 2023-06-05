@@ -9,7 +9,6 @@ import hre, { deployments, ethers } from "hardhat";
 import { LensGelatoGPT, ILensHub } from "../typechain";
 import { lensHubAbi } from "../helpers/lensHubAbi";
 import { mockProfiles } from "./helpers/MockProfiles";
-import { parseEther } from "ethers/lib/utils";
 
 const FIRST_SENTENCE = "fist sentence";
 const LONG_SENTENCE =
@@ -167,32 +166,5 @@ describe("GelatoLensGPT.sol", function () {
     expect(
       (await lensGelatoGPT.connect(admin).getPaginatedPrompts(10, 20)).length
     ).to.be.eq(5);
-  });
-
-  it("GelatoLensGPT.getNewPrompts: query", async () => {
-    await mockProfiles(1, 15, {
-      admin,
-      dedicatedMsgSenderAddress,
-      hre,
-      lensGelatoGPT,
-      lensHub,
-    });
-
-    expect(
-      (await lensGelatoGPT.connect(admin).getNewPrompts()).length
-    ).to.be.eq(15);
-
-    await setBalance(dedicatedMsgSenderAddress, parseEther("1"));
-    await impersonateAccount(dedicatedMsgSenderAddress);
-    const dedicatedMsgSenderSigner = await ethers.getSigner(
-      dedicatedMsgSenderAddress
-    );
-    await lensGelatoGPT
-      .connect(dedicatedMsgSenderSigner)
-      .removeNewProfileIds([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-
-    expect(
-      (await lensGelatoGPT.connect(admin).getNewPrompts()).length
-    ).to.be.eq(0);
   });
 });

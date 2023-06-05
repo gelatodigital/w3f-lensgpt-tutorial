@@ -69,10 +69,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   const isNewInterval = blockTime - lastRunStartTime >= INTERVAL_IN_MIN * 60;
   const lastIntervalRunFinished = nextPromptIndex == 0;
 
-  const isNewcomerRun = await lensGelatoGpt.areThereNewProfileIds();
-  const isScheduledRun = !isNewcomerRun && isNewInterval;
-
-  if (lastIntervalRunFinished && !isNewcomerRun && !isNewInterval) {
+  if (lastIntervalRunFinished && !isNewInterval) {
     return {
       canExec: false,
       message:
@@ -84,32 +81,12 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   const callDatas: Array<{ to: string; data: string }> = [];
 
-  if (isNewcomerRun) {
-    const allNewPrompts = await lensGelatoGpt.getNewPrompts();
-    const firstSliceOfNewPrompts = allNewPrompts.slice(
-      0,
-      NUMBER_OF_POSTS_PER_RUN
-    );
-
-    // Add call to remove firstSliceOfNewPrompts
-    // Assumption: in next run, the firstSliceOfNewPrompts will be the next ones
-    const profileIds = firstSliceOfNewPrompts.map((map) => map.profileId);
-    callDatas.push({
-      to: lensGelatoGPTAddress,
-      data: lensGelatoGpt.interface.encodeFunctionData("removeNewProfileIds", [
-        profileIds,
-      ]),
-    });
-
-    prompts.push(...firstSliceOfNewPrompts);
-  } else {
-    prompts.push(
-      ...(await lensGelatoGpt.getPaginatedPrompts(
-        nextPromptIndex,
-        nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
-      ))
-    );
-  }
+  prompts.push(
+    ...(await lensGelatoGpt.getPaginatedPrompts(
+      nextPromptIndex,
+      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN
+    ))
+  );
 
   const nonEmptyPrompts = prompts.filter(
     (prompt) => prompt.profileId.toString() !== "0"
@@ -210,24 +187,23 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
   }
 
   // Process storage updates only for scheduled runs
-  if (isScheduledRun) {
-    const totalNumberOfProfiles =
-      await lensGelatoGpt.getTotalNumberOfProfiles();
 
-    const isLastRun =
-      nextPromptIndex + NUMBER_OF_POSTS_PER_RUN >=
-      totalNumberOfProfiles.toNumber();
+  const totalNumberOfProfiles = await lensGelatoGpt.getTotalNumberOfProfiles();
 
-    if (lastIntervalRunFinished) {
-      await storage.set("lastRunStartTime", blockTime.toString());
-    } else if (isLastRun) {
-      await storage.set("nextPromptIndex", "0");
-    } else {
-      await storage.set(
-        "nextPromptIndex",
-        (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
-      );
-    }
+  const isLastRun =
+    nextPromptIndex + NUMBER_OF_POSTS_PER_RUN >=
+    totalNumberOfProfiles.toNumber();
+
+  if (lastIntervalRunFinished) {
+    await storage.set("lastRunStartTime", blockTime.toString());
+  }
+  if (isLastRun) {
+    await storage.set("nextPromptIndex", "0");
+  } else {
+    await storage.set(
+      "nextPromptIndex",
+      (nextPromptIndex + NUMBER_OF_POSTS_PER_RUN).toString()
+    );
   }
 
   return callDatas.length == 0

@@ -23,12 +23,11 @@ contract LensGelatoGPT is Proxied {
 
     address public immutable dedicatedMsgSender;
 
-    uint256 public fee = 5 ether;
+    uint256 public fee;
 
     mapping(uint256 => string) public promptByProfileId;
 
     EnumerableSetUpgradeable.UintSet private _profileIds;
-    EnumerableSetUpgradeable.UintSet private _newProfileIds;
 
     modifier onlyProfileOwner(uint256 _profileId) {
         require(
@@ -72,8 +71,6 @@ contract LensGelatoGPT is Proxied {
             lensHub.getDispatcher(_profileId) == dedicatedMsgSender,
             "LensGelatoGPT.setPrompt: dispatcher"
         );
-
-        _newProfileIds.add(_profileId);
         _profileIds.add(_profileId);
 
         promptByProfileId[_profileId] = _prompt;
@@ -86,17 +83,8 @@ contract LensGelatoGPT is Proxied {
             _profileIds.contains(_profileId),
             "LensGelatoGPT.stopPrompt: 404"
         );
-        _newProfileIds.remove(_profileId);
         _profileIds.remove(_profileId);
         delete promptByProfileId[_profileId];
-    }
-
-    function removeNewProfileIds(
-        uint256[] calldata __profileIds
-    ) external onlyDedicatedMsgSender {
-        for (uint256 i = 0; i < __profileIds.length; i++) {
-            _newProfileIds.remove(__profileIds[i]);
-        }
     }
 
     function getPaginatedPrompts(
@@ -127,35 +115,11 @@ contract LensGelatoGPT is Proxied {
         }
     }
 
-    function getNewPrompts() external view returns (Prompt[] memory prompts) {
-        uint256 length = _newProfileIds.length();
-
-        prompts = new Prompt[](length);
-
-        for (uint256 i = 0; i < length; i++) {
-            uint256 newProfileId = _newProfileIds.at(i);
-
-            // Filter out users with wrong Dispatcher on Lens
-            if (lensHub.getDispatcher(newProfileId) != dedicatedMsgSender)
-                continue;
-
-            prompts[i] = Prompt(newProfileId, promptByProfileId[newProfileId]);
-        }
-    }
-
     function getProfileIds() external view returns (uint256[] memory) {
         return _profileIds.values();
     }
 
-    function getNewProfileIds() external view returns (uint256[] memory) {
-        return _newProfileIds.values();
-    }
-
     function getTotalNumberOfProfiles() external view returns (uint256) {
         return _profileIds.length();
-    }
-
-    function areThereNewProfileIds() external view returns (bool) {
-        return _newProfileIds.length() > 0;
     }
 }

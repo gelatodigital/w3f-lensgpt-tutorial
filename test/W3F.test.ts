@@ -92,7 +92,7 @@ describe("W3F", function () {
     expect(result.canExec).to.be.eq(true);
 
     if (result.canExec == true) {
-      expect(result.callData.length).to.be.eq(2);
+      expect(result.callData.length).to.be.eq(1);
     }
   });
 
@@ -121,11 +121,12 @@ describe("W3F", function () {
         value: ethers.utils.parseEther("1"),
         gasLimit: 10000000,
       });
-      const data = result.callData[1];
+      const data = result.callData[0];
       await impersonateAccount(dedicatedMsgSenderAddress);
       const dedicatedMsgSenderSigner = await ethers.getSigner(
         dedicatedMsgSenderAddress
       );
+
       await dedicatedMsgSenderSigner.sendTransaction({
         to: data.to,
         data: data.data,
@@ -159,7 +160,7 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(6);
+      expect(w3fResultCall1.result.callData.length).to.be.eq(5);
       expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
     }
   });
@@ -192,8 +193,8 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(5);
-      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
+      expect(w3fResultCall1.result.callData.length).to.be.eq(4);
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("5");
     }
   });
 
@@ -208,7 +209,7 @@ describe("W3F", function () {
       lensHub,
     });
 
-    const storage = {
+    let storage = {
       nextPromptIndex: "0",
       lastPostTime: "0",
     };
@@ -220,34 +221,29 @@ describe("W3F", function () {
     expect(w3fResultCall1.result.canExec).to.be.eq(true);
 
     if (w3fResultCall1.result.canExec == true) {
-      expect(w3fResultCall1.result.callData.length).to.be.eq(6);
-      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("0");
-
-      await setBalance(dedicatedMsgSenderAddress, parseEther("1"));
-      await impersonateAccount(dedicatedMsgSenderAddress);
-      const dedicatedMsgSenderSigner = await ethers.getSigner(
-        dedicatedMsgSenderAddress
-      );
-
-      await dedicatedMsgSenderSigner.sendTransaction({
-        to: w3fResultCall1.result.callData[0].to,
-        data: w3fResultCall1.result.callData[0].data,
-      });
+      expect(w3fResultCall1.result.callData.length).to.be.eq(5);
+      expect(w3fResultCall1.storage.storage.nextPromptIndex).to.be.eq("5");
     }
-
+    storage = {
+      nextPromptIndex: "5",
+      lastPostTime: "0",
+    };
     const w3fResultCall2 = await lensGelatoW3f.run({ userArgs, storage });
 
     expect(w3fResultCall2.result.canExec).to.be.eq(true);
 
     if (w3fResultCall2.result.canExec == true) {
-      expect(w3fResultCall2.result.callData.length).to.be.eq(6);
-      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("0");
+      expect(w3fResultCall2.result.callData.length).to.be.eq(5);
+      expect(w3fResultCall2.storage.storage.nextPromptIndex).to.be.eq("10");
     }
-
+    storage = {
+      nextPromptIndex: "10",
+      lastPostTime: "0",
+    };
     const w3fResultCall3 = await lensGelatoW3f.run({ userArgs, storage });
     expect(w3fResultCall3.result.canExec).to.be.eq(true);
     if (w3fResultCall3.result.canExec == true) {
-      expect(w3fResultCall3.result.callData.length).to.be.eq(6);
+      expect(w3fResultCall3.result.callData.length).to.be.eq(5);
     }
     expect(w3fResultCall3.storage.storage.nextPromptIndex).to.be.eq("0");
   });
