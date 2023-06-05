@@ -24,8 +24,8 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
 
   // User Secrets
   const WEB3_STORAGE_API_KEY = await secrets.get("WEB3_STORAGE_API_KEY");
-  const SECRETS_OPEN_AI_API_KEY = await secrets.get("OPEN_AI_API_KEY");
-  if (!WEB3_STORAGE_API_KEY || !SECRETS_OPEN_AI_API_KEY) {
+  const OPEN_AI_API_KEY = await secrets.get("OPEN_AI_API_KEY");
+  if (!WEB3_STORAGE_API_KEY || !OPEN_AI_API_KEY) {
     console.error("Error: Missing secrets");
     return {
       canExec: false,
@@ -103,7 +103,7 @@ Web3Function.onRun(async (context: Web3FunctionContext) => {
       let text: string | undefined = undefined;
       try {
         const openai = new OpenAIApi(
-          new Configuration({ apiKey: SECRETS_OPEN_AI_API_KEY })
+          new Configuration({ apiKey: OPEN_AI_API_KEY })
         );
         const response = await openai.createCompletion({
           model: "text-davinci-003",
