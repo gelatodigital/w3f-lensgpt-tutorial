@@ -1,7 +1,7 @@
-import hre from "hardhat";
+import hre, { deployments, getNamedAccounts } from "hardhat";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { sleep } from "../src/utils";
+import { sleep } from "../web3-functions/utils";
 
 const isHardhat = hre.network.name === "hardhat";
 

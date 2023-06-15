@@ -22,7 +22,7 @@ const config: HardhatUserConfig = {
 
   // web3 functions
   w3f: {
-    rootDir: "./src/web3-functions",
+    rootDir: "./web3-functions",
     debug: false,
     networks: ["hardhat", "mumbai"], //(multiChainProvider) injects provider for these networks
   },

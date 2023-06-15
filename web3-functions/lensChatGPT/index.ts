@@ -7,16 +7,16 @@ import { Contract, utils } from "ethers";
 import { Configuration, OpenAIApi } from "openai";
 import { v4 as uuidv4 } from "uuid";
 import { Web3Storage, File, CIDString } from "web3.storage";
-import { lensHubAbi } from "../../../helpers/lensHubAbi";
+import { lensHubAbi } from "../../helpers/lensHubAbi";
 import {
   LensClient,
   PublicationMainFocus,
   PublicationMetadataDisplayTypes,
   production,
 } from "@lens-protocol/client";
-import { promptAbi } from "../../../helpers/promptAbi";
-import { LensGelatoGPT } from "../../../typechain";
-import { PromptStructOutput } from "../../../typechain/LensGelatoGPT";
+import { promptAbi } from "../../helpers/promptAbi";
+import { LensGelatoGPT } from "../../typechain";
+import { PromptStructOutput } from "../../typechain/LensGelatoGPT";
 
 Web3Function.onRun(async (context: Web3FunctionContext) => {
   const { userArgs, multiChainProvider, secrets, storage } = context;

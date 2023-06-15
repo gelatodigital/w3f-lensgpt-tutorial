@@ -15,8 +15,8 @@
     "lint:ts": "eslint -c .eslintrc.json --ext \"**/*.ts\" \"**/*.test.ts\"",
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "postinstall": "yarn husky install",
-    "w3f:deploy": "npx w3f deploy src/web3-functions/lensChatGPT/index.ts",
-    "w3f:test": "npx w3f test src/web3-functions/lensChatGPT/index.ts --logs --chain-id=80001"
+    "w3f:deploy": "npx w3f deploy web3-functions/lensChatGPT/index.ts",
+    "w3f:test": "npx w3f test web3-functions/lensChatGPT/index.ts --logs --chain-id=80001"
   },
   "license": "ISC",
   "devDependencies": {
